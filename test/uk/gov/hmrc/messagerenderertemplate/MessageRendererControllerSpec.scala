@@ -1,5 +1,22 @@
+/*
+ * Copyright 2016 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package uk.gov.hmrc.messagerenderertemplate.controllers
 
+import org.apache.http.HttpHeaders
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.mock.MockitoSugar
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
@@ -39,18 +56,18 @@ class MessageRendererControllerSpec extends UnitSpec
     messageService.reset()
   }
 
-  val messageService = new MessageServiceMock("authToken234")
+  private val authToken = "authToken234"
+  val messageService = new MessageServiceMock(authToken)
 
   val random = new Random
   
   def randomUtr = SaUtr(random.nextInt(1000000).toString)
 
   def utrMessageFor(utr: SaUtr) = {
-    def randomNext = random.nextInt(1000000)
     Message(
       Recipient("sa", utr),
-      s"Message for recipient: sa - $randomNext",
-      hash = random.nextString(10)
+      s"Message for recipient: sa - ${utr.value}",
+      hash = "messageHash"
     )
   }
 
@@ -66,8 +83,8 @@ class MessageRendererControllerSpec extends UnitSpec
   )
 
 
-  val fakeGetRequest = FakeRequest("GET", "/")
-  val fakePostRequest = FakeRequest("POST", "/")
+  val fakeGetRequest = FakeRequest("GET", "/").withHeaders((HttpHeaders.AUTHORIZATION, authToken))
+  val fakePostRequest = FakeRequest("POST", "/").withHeaders((HttpHeaders.AUTHORIZATION, authToken))
   
   def messageRendererController = MessageRendererController
 
@@ -78,7 +95,7 @@ class MessageRendererControllerSpec extends UnitSpec
 
       messageService.successfullyCreates(utrMessageFor(taxId))
       
-      val result = messageRendererController.createNewMessage(regime, randomUtr.value)(fakePostRequest)
+      val result = messageRendererController.createNewMessage(regime, taxId.value)(fakePostRequest)
       
       status(result) shouldBe Status.CREATED
     }
@@ -89,7 +106,7 @@ class MessageRendererControllerSpec extends UnitSpec
       
       messageService.returnsDuplicateExistsFor(utrMessageFor(taxId))
 
-      val result = messageRendererController.createNewMessage(regime, randomUtr.value)(fakePostRequest)
+      val result = messageRendererController.createNewMessage(regime, taxId.value)(fakePostRequest)
       status(result) shouldBe Status.OK
     }
 
@@ -101,17 +118,17 @@ class MessageRendererControllerSpec extends UnitSpec
   "GET /:regime/:taxId/messages/:messageId" should {
 
     "render a utr message" in {
-      val taxId = SaUtr("")
-      val messageId = MessageId("92834")
-      val regime = "sa"
-      val result = messageRendererController.renderMessage(regime, taxId.toString, messageId.value)
+//      val taxId = SaUtr("")
+//      val messageId = MessageId("92834")
+//      val regime = "sa"
+//      val result = messageRendererController.renderMessage(regime, taxId.toString, messageId.value)
     }
 
     "render a nino message" in {
-      val taxId = Nino("")
-      val messageId = MessageId("92834")
-      val regime = "sa"
-      val result = messageRendererController.renderMessage(regime, taxId.toString, messageId.value)
+//      val taxId = Nino("")
+//      val messageId = MessageId("92834")
+//      val regime = "sa"
+//      val result = messageRendererController.renderMessage(regime, taxId.toString, messageId.value)
     }
   }
 }

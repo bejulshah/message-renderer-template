@@ -18,6 +18,8 @@ package uk.gov.hmrc.messagerenderertemplate.acceptance.microservices
 
 import com.github.tomakehurst.wiremock.client.WireMock._
 import play.api.http.{HeaderNames, Status}
+import uk.gov.hmrc.domain.{Nino, SaUtr}
+import uk.gov.hmrc.domain.TaxIds.TaxIdWithName
 import uk.gov.hmrc.messagerenderertemplate.domain.Message
 
 class MessageServiceMock(authToken: String, servicePort: Int = 8910)
@@ -26,56 +28,29 @@ class MessageServiceMock(authToken: String, servicePort: Int = 8910)
   def successfullyCreates(message: Message): Unit = {
     service.register(post(urlEqualTo("/messages")).
       withHeader(HeaderNames.AUTHORIZATION, equalTo(authToken)).
+      withRequestBody(equalToJson(jsonFor(message))).
       willReturn(aResponse().withStatus(Status.OK)))
   }
 
   def returnsDuplicateExistsFor(message: Message): Unit = {
     service.register(post(urlEqualTo("/messages")).
       withHeader(HeaderNames.AUTHORIZATION, equalTo(authToken)).
-      willReturn(aResponse().withStatus(Status.CREATED)))
+      withRequestBody(equalToJson(jsonFor(message))).
+      willReturn(aResponse().withStatus(Status.CONFLICT)))
   }
 
-  def rendered(message: Message) = {
+  def jsonFor(message: Message) = {
 
-    """
+    s"""
       | {
       |   "recipient" : {
-      |     "regime" : "sa",
+      |     "regime" : "${message.recipient.regime}",
       |     "identifier" : {
-      |       "sautr" : "1234567899"
+      |       "${message.recipient.taxId.name}" : "${message.recipient.taxId.value}"
       |     }
       |   },
-      |   "subject" : "Message subject line",
-      |   "body" : {
-      |     "meta-data-1": "meta-data-1-value",
-      |     "meta-data-2": "meta-data-2-value"
-      |   },
-      | "validFrom" : "2013-06-04",
-      | "alertDetails" : {
-      | "templateId": "messageTemplateId",
-      | "data": {
-      | "alertParam1": "value1",
-      | "alertParam2": "value2"
-      | },
-      | "recipientName": {
-      | "title": "Mr",
-      | "forename": "Wile",
-      | "secondForename": "E",
-      | "surname": "Coyote",
-      | "honours": "FAST"
-      | },
-      | "alertFrom": "2013-07-04"
-      | },
-      | "contentParameters": {
-      | "amount" : "£123.24",
-      | "other-param": "content value"
-      | },
-      | "statutory": true,
-      | "hash": "newMessageHashValue",
-      | "renderUrl": {
-      | "service": "renderServiceName",
-      | "url": "a/url/to/get/renderered/content/{messageId}"
-      | }
+      |   "subject" : "${message.subject}",
+      |   "hash" : "${message.hash}"
       | }
     """.stripMargin
   }

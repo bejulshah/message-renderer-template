@@ -17,23 +17,39 @@
 package uk.gov.hmrc.messagerenderertemplate.connectors
 
 import play.api.http.Status
-import play.api.libs.json.Json
+import play.api.libs.json.{Json, Writes}
 import uk.gov.hmrc.messagerenderertemplate.WSHttp
 import uk.gov.hmrc.messagerenderertemplate.domain._
 import uk.gov.hmrc.play.config.ServicesConfig
 import uk.gov.hmrc.play.http.{HeaderCarrier, HttpGet, HttpPost, Upstream4xxResponse}
-
 import uk.gov.hmrc.play.http.logging.MdcLoggingExecutionContext._
 
 import scala.concurrent.Future
+
 
 class MessageConnector extends MessageRepository with ServicesConfig {
   def http: HttpGet with HttpPost = WSHttp
 
   val messageBaseUrl: String = baseUrl("message")
 
+  import play.api.libs.json._
+  import play.api.libs.functional.syntax._
+
+  implicit val messageWrites: Writes[Message] = new Writes[Message] {
+    override def writes(message: Message) = Json.obj(
+      "recipient" -> Json.obj(
+        "regime" -> message.recipient.regime,
+        "identifier" -> Json.obj(
+          message.recipient.taxId.name -> message.recipient.taxId.value
+        )
+      ),
+      "subject" -> message.subject,
+      "hash" -> message.hash
+    )
+  }
+
   override def add(message: Message)(implicit hc: HeaderCarrier): Future[AddingResult] = {
-    http.POST(s"$messageBaseUrl/messages", Json.obj())
+    http.POST(s"$messageBaseUrl/messages", message)
       .map { response =>
         response.status match {
           case Status.OK => MessageAdded()

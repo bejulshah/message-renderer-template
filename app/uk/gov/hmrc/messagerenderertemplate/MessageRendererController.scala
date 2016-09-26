@@ -35,9 +35,9 @@ trait MessageRendererController extends BaseController {
 
   def createNewMessage(regime: String, taxIdentifier: String) = Action.async { implicit request =>
     messageRepository.add(Message(
-      Recipient("regime", SaUtr("bla")),
-      "bla",
-      "hash"
+      Recipient(regime, SaUtr(taxIdentifier)),
+      subject = s"Message for recipient: sa - $taxIdentifier",
+      hash = "messageHash"
     )).map {
       case MessageAdded() => Created("")
       case DuplicateMessage() => Ok("")

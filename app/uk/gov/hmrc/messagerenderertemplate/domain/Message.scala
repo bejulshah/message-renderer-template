@@ -34,4 +34,4 @@ final case class AlertDetails(templateId: String = "newMessageAlert",
                               alertFrom: LocalDate = LocalDate.now
                              )
 
-final case class Recipient(regime: String, taxIdWithName: TaxIdWithName)
+final case class Recipient(regime: String, taxId: TaxIdWithName)
