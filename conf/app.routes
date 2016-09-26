@@ -1,0 +1,5 @@
+# microservice specific routes
+
+POST        /:regime/:taxIdentifier/messages        uk.gov.hmrc.messagerenderertemplate.controllers.MessageRendererController.createNewMessage(regime: String, taxIdentifier: String)
+
+GET         /:regime/:taxIdentifier/messages/:messageId                uk.gov.hmrc.messagerenderertemplate.controllers.MessageRendererController.renderMessage(regime: String, taxIdentifier: String, messageId: String)
