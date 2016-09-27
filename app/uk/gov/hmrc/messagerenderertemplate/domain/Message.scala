@@ -22,16 +22,14 @@ import uk.gov.hmrc.domain.TaxIds.TaxIdWithName
 final case class Message(recipient: Recipient,
                          subject: String,
                          hash: String,
-                         body: Map[String, String] = Map(),
-                         alertDetails: AlertDetails = AlertDetails(),
-                         statutory: Boolean = false,
+                         alertDetails: AlertDetails,
+                         statutory: Option[Boolean],
                          validFrom: LocalDate = LocalDate.now) {
 
 }
 
-final case class AlertDetails(templateId: String = "newMessageAlert",
-                              data: Map[String, String] = Map(),
-                              alertFrom: LocalDate = LocalDate.now
-                             )
+final case class AlertDetails(templateId: String,
+                              data: Map[String, String],
+                              alertFrom: LocalDate = LocalDate.now)
 
 final case class Recipient(regime: String, taxId: TaxIdWithName)

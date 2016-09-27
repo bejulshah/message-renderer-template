@@ -36,16 +36,23 @@ class MessageConnector extends MessageRepository with ServicesConfig {
   import play.api.libs.functional.syntax._
 
   implicit val messageWrites: Writes[Message] = new Writes[Message] {
-    override def writes(message: Message) = Json.obj(
-      "recipient" -> Json.obj(
-        "regime" -> message.recipient.regime,
-        "identifier" -> Json.obj(
-          message.recipient.taxId.name -> message.recipient.taxId.value
-        )
-      ),
-      "subject" -> message.subject,
-      "hash" -> message.hash
-    )
+    override def writes(message: Message) = {
+      val json = Json.obj(
+        "recipient" -> Json.obj(
+          "regime" -> message.recipient.regime,
+          "identifier" -> Json.obj(
+            message.recipient.taxId.name -> message.recipient.taxId.value
+          )
+        ),
+        "subject" -> message.subject,
+        "hash" -> message.hash
+      )
+      if(message.statutory.isDefined) {
+        json + ("statutory", JsBoolean(message.statutory.get))
+      } else {
+        json
+      }
+    }
   }
 
   override def add(message: Message)(implicit hc: HeaderCarrier): Future[AddingResult] = {

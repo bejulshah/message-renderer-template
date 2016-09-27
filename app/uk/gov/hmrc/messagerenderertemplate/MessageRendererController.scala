@@ -17,12 +17,12 @@
 package uk.gov.hmrc.messagerenderertemplate.controllers
 
 import play.api.mvc._
-import uk.gov.hmrc.domain.SaUtr
+import uk.gov.hmrc.domain.{Nino, SaUtr, TaxIdentifier}
 import uk.gov.hmrc.messagerenderertemplate.connectors.MessageConnector
 import uk.gov.hmrc.messagerenderertemplate.domain._
 import uk.gov.hmrc.play.microservice.controller.BaseController
-
 import uk.gov.hmrc.play.http.logging.MdcLoggingExecutionContext._
+
 import scala.concurrent.Future
 
 object MessageRendererController extends MessageRendererController {
@@ -33,14 +33,31 @@ trait MessageRendererController extends BaseController {
 
   def messageRepository: MessageRepository
 
+
   def createNewMessage(regime: String, taxIdentifier: String) = Action.async { implicit request =>
     messageRepository.add(Message(
-      Recipient(regime, SaUtr(taxIdentifier)),
-      subject = s"Message for recipient: sa - $taxIdentifier",
-      hash = "messageHash"
+      Recipient(regime, taxIdFor(regime, taxIdentifier)),
+      subject = s"Message for recipient: $regime - $taxIdentifier",
+      hash = "messageHash",
+      alertDetails = AlertDetails(templateId = "bla", data = Map()),
+      statutory = statutoryFor(regime)
     )).map {
       case MessageAdded() => Created("")
       case DuplicateMessage() => Ok("")
+    }
+  }
+
+  def statutoryFor(regime: String): Option[Boolean] = {
+    regime match {
+      case "sa" => Some(true)
+      case "paye" => None
+    }
+  }
+
+  def taxIdFor(regime: String, taxIdentifier: String) = {
+    regime match {
+      case "sa" => SaUtr(taxIdentifier)
+      case "paye" => Nino(taxIdentifier)
     }
   }
 

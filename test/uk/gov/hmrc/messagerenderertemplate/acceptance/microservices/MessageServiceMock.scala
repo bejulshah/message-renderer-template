@@ -18,42 +18,94 @@ package uk.gov.hmrc.messagerenderertemplate.acceptance.microservices
 
 import com.github.tomakehurst.wiremock.client.WireMock._
 import play.api.http.{HeaderNames, Status}
-import uk.gov.hmrc.domain.{Nino, SaUtr}
-import uk.gov.hmrc.domain.TaxIds.TaxIdWithName
+import play.api.libs.json.{JsBoolean, Json}
 import uk.gov.hmrc.messagerenderertemplate.domain.Message
 
 class MessageServiceMock(authToken: String, servicePort: Int = 8910)
   extends WiremockService("message", servicePort) {
 
+  def receivedMessageAddRequestFor(message: Message): Unit = {
+    service.verifyThat(postRequestedFor(urlEqualTo("/messages")).
+      withHeader(HeaderNames.AUTHORIZATION, equalTo(authToken)).
+      withRequestBody(equalToJson(jsonFor(message)))
+    )
+  }
+
   def successfullyCreates(message: Message): Unit = {
     service.register(post(urlEqualTo("/messages")).
-      withHeader(HeaderNames.AUTHORIZATION, equalTo(authToken)).
-      withRequestBody(equalToJson(jsonFor(message))).
       willReturn(aResponse().withStatus(Status.OK)))
   }
 
   def returnsDuplicateExistsFor(message: Message): Unit = {
     service.register(post(urlEqualTo("/messages")).
-      withHeader(HeaderNames.AUTHORIZATION, equalTo(authToken)).
-      withRequestBody(equalToJson(jsonFor(message))).
       willReturn(aResponse().withStatus(Status.CONFLICT)))
   }
 
-  def jsonFor(message: Message) = {
-
-    s"""
-      | {
-      |   "recipient" : {
-      |     "regime" : "${message.recipient.regime}",
-      |     "identifier" : {
-      |       "${message.recipient.taxId.name}" : "${message.recipient.taxId.value}"
-      |     }
-      |   },
-      |   "subject" : "${message.subject}",
-      |   "hash" : "${message.hash}"
-      | }
-    """.stripMargin
+  private def jsonFor(message: Message) = {
+    val json = Json.obj(
+      "recipient" -> Json.obj(
+        "regime" -> message.recipient.regime,
+        "identifier" -> Json.obj(
+          message.recipient.taxId.name -> message.recipient.taxId.value
+        )
+      ),
+      "subject" -> message.subject,
+      "hash" -> message.hash
+    )
+    if (message.statutory.isDefined) {
+      (json +("statutory", JsBoolean(message.statutory.get))).toString
+    } else {
+      json.toString
+    }
   }
+
+  private def jsonFor(body: Map[String, String]) = {
+    body.map { case (name, value) => s""" "$name": "$value" """ }.mkString("{\n", ",\n", "\n}")
+  }
+
+  //  |   "validFrom": "${formatDate(validFrom)}",
+  //  |   "alertDetails": {
+  //    |       ${alertFrom.map(vf => s""""alertFrom": "${formatDate(vf)}",""").getOrElse("")}
+  //    |       "data": {},
+  //    |       "templateId": "$alertTemplateId",
+  //    |       "recipientName" : ${Json.toJson(recipientName).toString()}
+  //    |    },
+  //  |   "hash": "$hash",
+  //  |   "statutory": $statutory,
+  //  |   "renderUrl": {
+  //    |     "service": "serviceAbc",
+  //    |     "url": "urlAbc"
+  //    |   }
+  //  "body" : {
+  //    "meta-data-1": "meta-data-1-value",
+  //    "meta-data-2": "meta-data-2-value"
+  //  },
+  //  "validFrom" : "2013-06-04",
+  //  "alertDetails" : {
+  //    "templateId": "messageTemplateId",
+  //    "data": {
+  //    "alertParam1": "value1",
+  //    "alertParam2": "value2"
+  //  },
+  //    "recipientName": {
+  //    "title": "Mr",
+  //    "forename": "Wile",
+  //    "secondForename": "E",
+  //    "surname": "Coyote",
+  //    "honours": "FAST"
+  //  },
+  //    "alertFrom": "2013-07-04"
+  //  },
+  //  "contentParameters": {
+  //    "amount" : "£123.24",
+  //    "other-param": "content value"
+  //  },
+  //  "statutory": true,
+  //  "hash": "newMessageHashValue",
+  //  "renderUrl": {
+  //    "service": "renderServiceName",
+  //    "url": "a/url/to/get/renderered/content/{messageId}"
+  //  }
 
   //  def getByIdReturns(message: UpstreamMessageResponse): Unit = {
   //    givenThat(get(urlEqualTo(s"/messages/${message.id}")).
