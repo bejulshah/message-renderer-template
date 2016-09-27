@@ -24,7 +24,7 @@ import uk.gov.hmrc.messagerenderertemplate.domain.Message
 class MessageServiceMock(authToken: String, servicePort: Int = 8910)
   extends WiremockService("message", servicePort) {
 
-  def receivedMessageAddRequestFor(message: Message): Unit = {
+  def receivedMessageCreateRequestFor(message: Message): Unit = {
     service.verifyThat(postRequestedFor(urlEqualTo("/messages")).
       withHeader(HeaderNames.AUTHORIZATION, equalTo(authToken)).
       withRequestBody(equalToJson(jsonFor(message)))

@@ -18,30 +18,25 @@ package uk.gov.hmrc.messagerenderertemplate.acceptance.microservices
 
 import com.github.tomakehurst.wiremock.client.WireMock._
 import play.api.libs.json.Json
-import uk.gov.hmrc.domain.SaUtr
+import uk.gov.hmrc.messagerenderertemplate.domain.Recipient
 
-class AuthServiceMock {
+class AuthServiceMock extends WiremockService("auth", servicePort = 8500) {
   def token = "authToken9349872"
 
-  def containsUserWith(utr: SaUtr) = {
-    givenThat(get(urlMatching("/auth/authority*"))
-      .willReturn(aResponse().withStatus(200).withBody(
-        Json.parse(
-          s"""
-             | {
-             |    "confidenceLevel": 500,
-             |    "uri": "testUri",
-             |    "accounts": {
-             |        "sa": {
-             |            "utr": "$utr"
-             |         },
-             |         "paye": {
-             |            "nino": "BC233445B"
-             |         }
-             |     }
-             | }""".
-            stripMargin
+  def succeedsFor(recipient: Recipient) = {
+    service.register(get(urlMatching("/auth/authority*"))
+      .willReturn(aResponse().withStatus(200).withBody(jsonFor(recipient))))
+  }
+
+  def jsonFor(recipient: Recipient) = {
+    Json.obj(
+      "confidenceLevel" -> 500,
+      "uri" -> "testUri",
+      "accounts" -> Json.obj(
+        recipient.regime -> Json.obj(
+          recipient.taxId.name -> recipient.taxId.value
         )
-          .toString())))
+      )
+    ).toString()
   }
 }

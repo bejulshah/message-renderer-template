@@ -21,14 +21,18 @@ import org.joda.time.DateTimeUtils
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.mock.MockitoSugar
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
-import play.api.Play
 import play.api.http.Status
-import play.api.test.{FakeApplication, FakeRequest}
-import uk.gov.hmrc.domain.{Nino, SaUtr}
-import uk.gov.hmrc.messagerenderertemplate.acceptance.microservices.MessageServiceMock
-import uk.gov.hmrc.messagerenderertemplate.domain.{AlertDetails, Message, MessageId, Recipient}
-import uk.gov.hmrc.play.test.{UnitSpec, WithFakeApplication}
+import play.api.libs.json.Json
+import play.api.libs.ws.WS
+import play.api.test.{FakeApplication, FakeRequest, TestServer}
 import uk.gov.hmrc.domain.TaxIds.TaxIdWithName
+import uk.gov.hmrc.domain.{Nino, SaUtr}
+import uk.gov.hmrc.messagerenderertemplate.acceptance.microservices.{AuthServiceMock, MessageServiceMock}
+import uk.gov.hmrc.messagerenderertemplate.controllers.model.{MessageCreationRequest, TaxId}
+import uk.gov.hmrc.messagerenderertemplate.domain.{AlertDetails, Message, Recipient}
+import uk.gov.hmrc.play.it.Port
+import uk.gov.hmrc.play.it.UrlHelper.-/
+import uk.gov.hmrc.play.test.{UnitSpec, WithFakeApplication}
 
 import scala.util.Random
 
@@ -43,13 +47,15 @@ class MessageRendererControllerSpec extends UnitSpec
 
   override def beforeAll() = {
     super.beforeAll()
-    Play.start(app)
+    appServer.start()
+    auth.start()
     messageService.start()
   }
 
   override def afterAll() = {
     super.afterAll()
-    Play.stop()
+    appServer.stop()
+    auth.stop()
     messageService.stop()
   }
 
@@ -62,11 +68,14 @@ class MessageRendererControllerSpec extends UnitSpec
   override protected def afterEach() = {
     super.afterEach()
     messageService.reset()
+    auth.reset()
     DateTimeUtils.setCurrentMillisSystem()
   }
 
-  private val authToken = "authToken234"
-  val messageService = new MessageServiceMock(authToken)
+  private val appPort = Port.randomAvailable
+
+  val auth = new AuthServiceMock()
+  val messageService = new MessageServiceMock(auth.token)
 
   val random = new Random
 
@@ -97,6 +106,7 @@ class MessageRendererControllerSpec extends UnitSpec
     )
   }
 
+
   object TestGlobal extends play.api.GlobalSettings
 
   implicit val app = FakeApplication(
@@ -108,10 +118,102 @@ class MessageRendererControllerSpec extends UnitSpec
     ) ++ messageService.configuration
   )
 
-  val fakeGetRequest = FakeRequest("GET", "/").withHeaders((HttpHeaders.AUTHORIZATION, authToken))
-  val fakePostRequest = FakeRequest("POST", "/").withHeaders((HttpHeaders.AUTHORIZATION, authToken))
+  val appServer = TestServer(appPort, app)
+
+  val fakeGetRequest = FakeRequest("GET", "/").withHeaders((HttpHeaders.AUTHORIZATION, auth.token))
+  val fakePostRequest = FakeRequest("POST", "/").withHeaders((HttpHeaders.AUTHORIZATION, auth.token))
+
+  def messageCreationRequestFor(message: Message) = {
+    Json.obj(
+      "regime" -> message.recipient.regime,
+      "taxId" -> Json.obj(
+        "name" -> message.recipient.taxId.name,
+        "value" -> message.recipient.taxId.value
+      )
+    ).toString
+  }
 
   def messageRendererController = MessageRendererController
+
+  def appPath(path: String) = {
+    s"http://localhost:$appPort/message-renderer-template/${-/(path)}"
+  }
+
+  def callCreateMessageWith(creationRequest: String) = {
+    WS.url(appPath(s"/messages")).
+      withHeaders(
+        (HttpHeaders.AUTHORIZATION, auth.token),
+        (HttpHeaders.CONTENT_TYPE, "application/json")
+      ).
+      post(creationRequest)
+  }
+
+
+  "POST /messages" should {
+    "return 201 if the message is newly created for utr" in {
+      val message = messageFor(randomUtr, "sa", statutory = Some(true))
+
+      auth.succeedsFor(message.recipient)
+      messageService.successfullyCreates(message)
+
+      val response = callCreateMessageWith(
+        messageCreationRequestFor(message)
+      )
+
+      response.futureValue.status shouldBe Status.CREATED
+      messageService.receivedMessageCreateRequestFor(message)
+    }
+
+    "return 200 if the message has been already created before for utr" in {
+      val message = messageFor(randomUtr, "sa", statutory = Some(true))
+
+      messageService.returnsDuplicateExistsFor(message)
+
+      val response = callCreateMessageWith(
+        messageCreationRequestFor(message)
+      )
+
+      response.futureValue.status shouldBe Status.OK
+      messageService.receivedMessageCreateRequestFor(message)
+    }
+
+    "return 201 if the message is newly created for nino" in {
+      val message = messageFor(randomNino, "paye", statutory = None)
+
+      messageService.successfullyCreates(message)
+
+      val response = callCreateMessageWith(
+        messageCreationRequestFor(message)
+      )
+
+      response.futureValue.status shouldBe Status.CREATED
+
+      messageService.receivedMessageCreateRequestFor(message)
+    }
+
+    "return 200 if the message has been already created before for nino" in {
+      val message = messageFor(randomNino, "paye", statutory = None)
+
+      messageService.returnsDuplicateExistsFor(message)
+
+      val response = callCreateMessageWith(
+        messageCreationRequestFor(message)
+      )
+
+      response.futureValue.status shouldBe Status.OK
+      messageService.receivedMessageCreateRequestFor(message)
+    }
+  }
+
+  def creationRequestFor(message: Message): MessageCreationRequest = {
+    MessageCreationRequest(
+      message.recipient.regime,
+      TaxId(
+        message.recipient.taxId.name,
+        message.recipient.taxId.value
+      )
+    )
+  }
 
   "POST /:regime/:taxId/messages" should {
     "return 201 if the message is newly created for utr" in {
@@ -125,7 +227,7 @@ class MessageRendererControllerSpec extends UnitSpec
       )(fakePostRequest)
 
       status(result) shouldBe Status.CREATED
-      messageService.receivedMessageAddRequestFor(message)
+      messageService.receivedMessageCreateRequestFor(message)
     }
 
     "return 200 if the message has been already created before for utr" in {
@@ -139,7 +241,7 @@ class MessageRendererControllerSpec extends UnitSpec
       )(fakePostRequest)
 
       status(result) shouldBe Status.OK
-      messageService.receivedMessageAddRequestFor(message)
+      messageService.receivedMessageCreateRequestFor(message)
     }
 
     "return 201 if the message is newly created for nino" in {
@@ -154,7 +256,7 @@ class MessageRendererControllerSpec extends UnitSpec
 
       status(result) shouldBe Status.CREATED
 
-      messageService.receivedMessageAddRequestFor(message)
+      messageService.receivedMessageCreateRequestFor(message)
     }
 
     "return 200 if the message has been already created before for nino" in {
@@ -168,7 +270,7 @@ class MessageRendererControllerSpec extends UnitSpec
       )(fakePostRequest)
 
       status(result) shouldBe Status.OK
-      messageService.receivedMessageAddRequestFor(message)
+      messageService.receivedMessageCreateRequestFor(message)
     }
   }
 
