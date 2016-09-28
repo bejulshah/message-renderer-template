@@ -16,63 +16,59 @@
 
 package uk.gov.hmrc.messagerenderertemplate.controllers
 
-import play.api.Play
+import play.api.libs.json.Json
 import play.api.mvc._
-import play.libs.Json
-import uk.gov.hmrc.domain.{Nino, SaUtr}
-import uk.gov.hmrc.messagerenderertemplate.connectors.MessageConnector
+import uk.gov.hmrc.messagerenderertemplate.connectors.MessageHeaderServiceConnector
 import uk.gov.hmrc.messagerenderertemplate.controllers.model.MessageCreationRequest
 import uk.gov.hmrc.messagerenderertemplate.domain._
-import uk.gov.hmrc.play.http.logging.MdcLoggingExecutionContext._
+import uk.gov.hmrc.messagerenderertemplate.persistence.MongoMessageBodyRepository
 import uk.gov.hmrc.play.microservice.controller.BaseController
+import uk.gov.hmrc.play.http.logging.MdcLoggingExecutionContext._
 
 import scala.concurrent.Future
 
 object MessageRendererController extends MessageRendererController {
-  override def messageRepository: MessageRepository = new MessageConnector
+
+  import play.api.Play.current
+  import play.modules.reactivemongo.ReactiveMongoPlugin
+
+  private implicit val connection = ReactiveMongoPlugin.mongoConnector.db
+
+  override def messageHeaderRepository: MessageHeaderRepository = new MessageHeaderServiceConnector
+
+  override def messageBodyRepository: MessageBodyRepository = new MongoMessageBodyRepository {
+    def mongo = connection
+  }
 }
 
 trait MessageRendererController extends BaseController {
 
-  def messageRepository: MessageRepository
+  def messageHeaderRepository: MessageHeaderRepository
 
-  def createNewMessage(regime: String, taxIdentifier: String) = Action.async { implicit request =>
-    messageRepository.add(Message(
-      Recipient(regime, taxIdFor(regime, taxIdentifier)),
-      subject = s"Message for recipient: $regime - $taxIdentifier",
-      hash = "messageHash",
-      alertDetails = AlertDetails(templateId = "bla", data = Map()),
-      statutory = statutoryFor(regime)
-    )).map {
-      case MessageAdded => Created("")
-      case DuplicateMessage => Ok("")
-    }
-  }
+  def messageBodyRepository: MessageBodyRepository
 
   def newMessage() = Action.async(parse.json) {
     implicit request =>
       withJsonBody[MessageCreationRequest] { messageCreationRequest =>
-        messageRepository.add(messageCreationRequest.generateMessage()).
-          map {
-            case MessageAdded => Created("")
-            case DuplicateMessage => Ok("")
+        val newMessage = messageCreationRequest.generateMessage()
+
+        messageBodyRepository.addNewMessageBodyWith(content = "<div>This is a generated message.</div>").
+          flatMap { messageBody =>
+            messageHeaderRepository.add(newMessage).
+              map {
+                case MessageAdded => Created(
+                  Json.obj(
+                    "message" -> Json.obj(
+                      "body" -> Json.obj(
+                        "id" -> messageBody.id.value
+                      )
+                    )
+                  )
+                )
+                case DuplicateMessage => Ok("")
+              }
           }
       }
-  }
-
-  def statutoryFor(regime: String): Option[Boolean] = {
-    regime match {
-      case "sa" => Some(true)
-      case "paye" => None
-    }
-  }
-
-
-  def taxIdFor(regime: String, taxIdentifier: String) = {
-    regime match {
-      case "sa" => SaUtr(taxIdentifier)
-      case "paye" => Nino(taxIdentifier)
-    }
   }
 
   def renderMessage(regime: String,

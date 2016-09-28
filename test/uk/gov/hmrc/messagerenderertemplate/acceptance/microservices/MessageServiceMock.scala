@@ -18,29 +18,29 @@ package uk.gov.hmrc.messagerenderertemplate.acceptance.microservices
 
 import com.github.tomakehurst.wiremock.client.WireMock._
 import play.api.http.Status
-import play.api.libs.json.{JsBoolean, Json}
-import uk.gov.hmrc.messagerenderertemplate.domain.Message
+import play.api.libs.json.Json
+import uk.gov.hmrc.messagerenderertemplate.domain.MessageHeader
 
 class MessageServiceMock(authToken: String, servicePort: Int = 8910)
   extends WiremockService("message", servicePort) {
 
-  def receivedMessageCreateRequestFor(message: Message): Unit = {
+  def receivedMessageCreateRequestFor(message: MessageHeader): Unit = {
     service.verifyThat(postRequestedFor(urlEqualTo("/messages")).
       withRequestBody(equalToJson(jsonFor(message)))
     )
   }
 
-  def successfullyCreates(message: Message): Unit = {
+  def successfullyCreates(message: MessageHeader): Unit = {
     service.register(post(urlEqualTo("/messages")).
       willReturn(aResponse().withStatus(Status.OK)))
   }
 
-  def returnsDuplicateExistsFor(message: Message): Unit = {
+  def returnsDuplicateExistsFor(message: MessageHeader): Unit = {
     service.register(post(urlEqualTo("/messages")).
       willReturn(aResponse().withStatus(Status.CONFLICT)))
   }
 
-  private def jsonFor(message: Message): String = {
+  private def jsonFor(message: MessageHeader): String = {
     val json = Json.obj(
       "recipient" -> Json.obj(
         "regime" -> message.recipient.regime,

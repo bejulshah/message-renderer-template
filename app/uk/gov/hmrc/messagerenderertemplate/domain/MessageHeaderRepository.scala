@@ -25,8 +25,8 @@ sealed trait AddingResult extends Product with Serializable
 case object MessageAdded extends AddingResult
 case object DuplicateMessage extends AddingResult
 
-trait MessageRepository {
+trait MessageHeaderRepository {
 
-  def add(message: Message)(implicit hc: HeaderCarrier): Future[AddingResult]
+  def add(messageHeader: MessageHeader)(implicit hc: HeaderCarrier): Future[AddingResult]
 
 }
