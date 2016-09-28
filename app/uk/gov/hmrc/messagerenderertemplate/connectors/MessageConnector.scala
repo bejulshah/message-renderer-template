@@ -17,12 +17,11 @@
 package uk.gov.hmrc.messagerenderertemplate.connectors
 
 import play.api.http.Status
-import play.api.libs.json.{Json, Writes}
 import uk.gov.hmrc.messagerenderertemplate.WSHttp
 import uk.gov.hmrc.messagerenderertemplate.domain._
 import uk.gov.hmrc.play.config.ServicesConfig
-import uk.gov.hmrc.play.http.{HeaderCarrier, HttpGet, HttpPost, Upstream4xxResponse}
 import uk.gov.hmrc.play.http.logging.MdcLoggingExecutionContext._
+import uk.gov.hmrc.play.http.{HeaderCarrier, HttpGet, HttpPost, Upstream4xxResponse}
 
 import scala.concurrent.Future
 
@@ -33,11 +32,10 @@ class MessageConnector extends MessageRepository with ServicesConfig {
   val messageBaseUrl: String = baseUrl("message")
 
   import play.api.libs.json._
-  import play.api.libs.functional.syntax._
 
   implicit val messageWrites: Writes[Message] = new Writes[Message] {
     override def writes(message: Message) = {
-      val json = Json.obj(
+      Json.obj(
         "recipient" -> Json.obj(
           "regime" -> message.recipient.regime,
           "identifier" -> Json.obj(
@@ -46,24 +44,20 @@ class MessageConnector extends MessageRepository with ServicesConfig {
         ),
         "subject" -> message.subject,
         "hash" -> message.hash
-      )
-      if(message.statutory.isDefined) {
-        json + ("statutory", JsBoolean(message.statutory.get))
-      } else {
-        json
-      }
+      ) ++ message.statutory.fold(Json.obj())(s => Json.obj("statutory" -> s))
     }
   }
 
   override def add(message: Message)(implicit hc: HeaderCarrier): Future[AddingResult] = {
-    http.POST(s"$messageBaseUrl/messages", message)
-      .map { response =>
+    http.POST(s"$messageBaseUrl/messages", message).
+      map { response =>
         response.status match {
-          case Status.OK => MessageAdded()
+          case Status.OK => MessageAdded
         }
-      }.recover {
-      case Upstream4xxResponse(message, Status.CONFLICT, _, _) => DuplicateMessage()
-    }
+      }.
+      recover {
+        case Upstream4xxResponse(message, Status.CONFLICT, _, _) => DuplicateMessage
+      }
   }
 }
 

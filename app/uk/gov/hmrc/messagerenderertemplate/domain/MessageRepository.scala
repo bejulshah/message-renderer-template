@@ -20,10 +20,10 @@ import uk.gov.hmrc.play.http.HeaderCarrier
 
 import scala.concurrent.Future
 
-sealed trait AddingResult
+sealed trait AddingResult extends Product with Serializable
 
-final case class MessageAdded() extends AddingResult
-final case class DuplicateMessage() extends AddingResult
+case object MessageAdded extends AddingResult
+case object DuplicateMessage extends AddingResult
 
 trait MessageRepository {
 

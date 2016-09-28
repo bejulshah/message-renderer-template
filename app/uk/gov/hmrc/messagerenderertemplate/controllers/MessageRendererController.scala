@@ -44,8 +44,8 @@ trait MessageRendererController extends BaseController {
       alertDetails = AlertDetails(templateId = "bla", data = Map()),
       statutory = statutoryFor(regime)
     )).map {
-      case MessageAdded() => Created("")
-      case DuplicateMessage() => Ok("")
+      case MessageAdded => Created("")
+      case DuplicateMessage => Ok("")
     }
   }
 
@@ -54,8 +54,8 @@ trait MessageRendererController extends BaseController {
       withJsonBody[MessageCreationRequest] { messageCreationRequest =>
         messageRepository.add(messageCreationRequest.generateMessage()).
           map {
-            case MessageAdded() => Created("")
-            case DuplicateMessage() => Ok("")
+            case MessageAdded => Created("")
+            case DuplicateMessage => Ok("")
           }
       }
   }

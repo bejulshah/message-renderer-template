@@ -16,26 +16,20 @@
 
 package uk.gov.hmrc.messagerenderertemplate.controllers.model
 
-import play.api.libs.json.{JsResult, _}
+import play.api.libs.functional.syntax._
+import play.api.libs.json._
 import uk.gov.hmrc.domain.{Nino, SaUtr}
 import uk.gov.hmrc.messagerenderertemplate.domain.{AlertDetails, Message, Recipient}
 
-final case class MessageCreationRequest(regime: String, taxId: TaxId) {
+final case class MessageCreationRequest(regime: String, taxId: TaxId, statutory: Option[Boolean]) {
 
   def generateMessage() = Message(
     Recipient(regime, taxId.asDomainTaxId),
     subject = s"Message for recipient: $regime - ${taxId.value}",
     hash = "messageHash",
     alertDetails = AlertDetails(templateId = "bla", data = Map()),
-    statutory = statutoryFor(regime)
+    statutory = statutory
   )
-
-  def statutoryFor(regime: String): Option[Boolean] = {
-    regime match {
-      case "sa" => Some(true)
-      case "paye" => None
-    }
-  }
 }
 
 final case class TaxId(name: String, value: String) {
@@ -47,21 +41,20 @@ final case class TaxId(name: String, value: String) {
   }
 }
 
+object TaxId {
+  implicit val taxIdReads: Reads[TaxId] =
+    (
+      (__ \ "name").read[String] and
+        (__ \ "value").read[String]
+      ) (TaxId.apply _)
+}
+
 object MessageCreationRequest {
 
-  implicit val messageCreationReads: Reads[MessageCreationRequest] = new Reads[MessageCreationRequest] {
-    override def reads(json: JsValue): JsResult[MessageCreationRequest] = {
-      val regime: String = (json \ "regime").as[String]
-      val name = (json \ "taxId" \ "name").as[String]
-      val value = (json \ "taxId" \ "value").as[String]
-
-      JsSuccess(
-        MessageCreationRequest(
-          regime,
-          TaxId(name, value)
-        )
-      )
-    }
-  }
-
+  implicit val messageCreationReads: Reads[MessageCreationRequest] =
+    (
+      (__ \ "regime").read[String] and
+        (__ \ "taxId").read[TaxId] and
+        (__ \ "statutory").readNullable[Boolean]
+      ) (MessageCreationRequest.apply _)
 }

@@ -30,6 +30,18 @@ class MessageCreationRequestSpec extends UnitSpec {
       messageCreationRequest.get.regime shouldBe "sa"
       messageCreationRequest.get.taxId.name shouldBe "sautr"
       messageCreationRequest.get.taxId.value shouldBe "419794"
+      messageCreationRequest.get.statutory shouldBe None
+    }
+
+    "be parsed from json for statutory" in {
+      val messageCreationRequest: JsResult[MessageCreationRequest] = MessageCreationRequest.messageCreationReads.
+        reads(Json.parse("""{"regime":"sa","taxId":{"name":"sautr","value":"419794"}, "statutory": true}"""))
+
+      messageCreationRequest.isSuccess shouldBe true
+      messageCreationRequest.get.regime shouldBe "sa"
+      messageCreationRequest.get.taxId.name shouldBe "sautr"
+      messageCreationRequest.get.taxId.value shouldBe "419794"
+      messageCreationRequest.get.statutory shouldBe Some(true)
     }
   }
 }
