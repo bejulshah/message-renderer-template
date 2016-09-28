@@ -26,37 +26,37 @@ import uk.gov.hmrc.play.http.{HeaderCarrier, HttpGet, HttpPost, Upstream4xxRespo
 import scala.concurrent.Future
 
 
-class MessageConnector extends MessageRepository with ServicesConfig {
+class MessageHeaderServiceConnector extends MessageHeaderRepository with ServicesConfig {
   def http: HttpGet with HttpPost = WSHttp
 
   val messageBaseUrl: String = baseUrl("message")
 
   import play.api.libs.json._
 
-  implicit val messageWrites: Writes[Message] = new Writes[Message] {
-    override def writes(message: Message) = {
+  private implicit val messageWrites: Writes[MessageHeader] = new Writes[MessageHeader] {
+    override def writes(messageHeader: MessageHeader) = {
       Json.obj(
         "recipient" -> Json.obj(
-          "regime" -> message.recipient.regime,
+          "regime" -> messageHeader.recipient.regime,
           "identifier" -> Json.obj(
-            message.recipient.taxId.name -> message.recipient.taxId.value
+            messageHeader.recipient.taxId.name -> messageHeader.recipient.taxId.value
           )
         ),
-        "subject" -> message.subject,
-        "hash" -> message.hash
-      ) ++ message.statutory.fold(Json.obj())(s => Json.obj("statutory" -> s))
+        "subject" -> messageHeader.subject,
+        "hash" -> messageHeader.hash
+      ) ++ messageHeader.statutory.fold(Json.obj())(s => Json.obj("statutory" -> s))
     }
   }
 
-  override def add(message: Message)(implicit hc: HeaderCarrier): Future[AddingResult] = {
-    http.POST(s"$messageBaseUrl/messages", message).
+  override def add(messageHeader: MessageHeader)(implicit hc: HeaderCarrier): Future[AddingResult] = {
+    http.POST(s"$messageBaseUrl/messages", messageHeader).
       map { response =>
         response.status match {
           case Status.OK => MessageAdded
         }
       }.
       recover {
-        case Upstream4xxResponse(message, Status.CONFLICT, _, _) => DuplicateMessage
+        case Upstream4xxResponse(_, Status.CONFLICT, _, _) => DuplicateMessage
       }
   }
 }

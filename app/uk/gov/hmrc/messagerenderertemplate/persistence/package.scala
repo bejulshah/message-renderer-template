@@ -14,19 +14,16 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.messagerenderertemplate.domain
+package uk.gov.hmrc.messagerenderertemplate
 
-import uk.gov.hmrc.play.http.HeaderCarrier
+import play.api.Play.current
+import play.modules.reactivemongo.ReactiveMongoPlugin
 
-import scala.concurrent.Future
+package object persistence {
 
-sealed trait AddingResult extends Product with Serializable
+  private implicit val connection = ReactiveMongoPlugin.mongoConnector.db
 
-case object MessageAdded extends AddingResult
-case object DuplicateMessage extends AddingResult
-
-trait MessageRepository {
-
-  def add(message: Message)(implicit hc: HeaderCarrier): Future[AddingResult]
-
+  lazy val MongoMessageBodyRepository = new MongoMessageBodyRepository {
+    def mongo = connection
+  }
 }

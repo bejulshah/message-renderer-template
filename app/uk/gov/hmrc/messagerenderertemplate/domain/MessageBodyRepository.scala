@@ -16,20 +16,10 @@
 
 package uk.gov.hmrc.messagerenderertemplate.domain
 
-import org.joda.time.LocalDate
-import uk.gov.hmrc.domain.TaxIds.TaxIdWithName
+import scala.concurrent.{ExecutionContext, Future}
 
-final case class Message(recipient: Recipient,
-                         subject: String,
-                         hash: String,
-                         alertDetails: AlertDetails,
-                         statutory: Option[Boolean],
-                         validFrom: LocalDate = LocalDate.now) {
+trait MessageBodyRepository {
+
+  def addNewMessageBodyWith(content: String)(implicit ec: ExecutionContext): Future[MessageBody]
 
 }
-
-final case class AlertDetails(templateId: String,
-                              data: Map[String, String],
-                              alertFrom: LocalDate = LocalDate.now)
-
-final case class Recipient(regime: String, taxId: TaxIdWithName)

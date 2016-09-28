@@ -18,39 +18,41 @@ package uk.gov.hmrc.messagerenderertemplate.acceptance.microservices
 
 import com.github.tomakehurst.wiremock.client.WireMock._
 import play.api.http.Status
-import play.api.libs.json.{JsBoolean, Json}
-import uk.gov.hmrc.messagerenderertemplate.domain.Message
+import play.api.libs.json.Json
+import uk.gov.hmrc.messagerenderertemplate.domain.MessageHeader
 
 class MessageServiceMock(authToken: String, servicePort: Int = 8910)
   extends WiremockService("message", servicePort) {
 
-  def receivedMessageCreateRequestFor(message: Message): Unit = {
+  def receivedMessageCreateRequestFor(messageHeader: MessageHeader): Unit = {
     service.verifyThat(postRequestedFor(urlEqualTo("/messages")).
-      withRequestBody(equalToJson(jsonFor(message)))
+      withRequestBody(equalToJson(jsonFor(messageHeader)))
     )
   }
 
-  def successfullyCreates(message: Message): Unit = {
+  def successfullyCreates(messageHeader: MessageHeader): Unit = {
     service.register(post(urlEqualTo("/messages")).
       willReturn(aResponse().withStatus(Status.OK)))
   }
 
-  def returnsDuplicateExistsFor(message: Message): Unit = {
+  def returnsDuplicateExistsFor(messageHeader: MessageHeader): Unit = {
     service.register(post(urlEqualTo("/messages")).
       willReturn(aResponse().withStatus(Status.CONFLICT)))
   }
 
-  private def jsonFor(message: Message): String = {
-    val json = Json.obj(
-      "recipient" -> Json.obj(
-        "regime" -> message.recipient.regime,
-        "identifier" -> Json.obj(
-          message.recipient.taxId.name -> message.recipient.taxId.value
-        )
-      ),
-      "subject" -> message.subject,
-      "hash" -> message.hash
-    ) ++ message.statutory.fold(Json.obj())(s => Json.obj("statutory" -> s))
-    json.toString
+  private def jsonFor(messageHeader: MessageHeader): String = {
+    Json.prettyPrint(
+      Json.obj(
+        "recipient" -> Json.obj(
+          "regime" -> messageHeader.recipient.regime,
+          "identifier" -> Json.obj(
+            messageHeader.recipient.taxId.name -> messageHeader.recipient.taxId.value
+          )
+        ),
+        "subject" -> messageHeader.subject,
+        "hash" -> messageHeader.hash
+      ) ++ messageHeader.statutory.fold(Json.obj())(s => Json.obj("statutory" -> s))
+
+    )
   }
 }

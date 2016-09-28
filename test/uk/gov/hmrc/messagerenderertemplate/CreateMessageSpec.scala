@@ -21,21 +21,27 @@ import org.joda.time.DateTimeUtils
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.mock.MockitoSugar
 import org.scalatest.prop.TableDrivenPropertyChecks
-import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, LoneElement}
 import play.api.http.Status
-import play.api.libs.json.{JsBoolean, Json}
+import play.api.libs.json.Json
 import play.api.libs.ws.WS
 import play.api.test.{FakeApplication, FakeRequest, TestServer}
+import reactivemongo.bson.BSONObjectID
+import reactivemongo.json.ImplicitBSONHandlers._
+import reactivemongo.json.collection.JSONCollection
 import uk.gov.hmrc.domain.TaxIds.TaxIdWithName
 import uk.gov.hmrc.domain.{Nino, SaUtr}
 import uk.gov.hmrc.messagerenderertemplate.acceptance.microservices.{AuthServiceMock, MessageServiceMock}
-import uk.gov.hmrc.messagerenderertemplate.domain.{AlertDetails, Message, Recipient}
+import uk.gov.hmrc.messagerenderertemplate.domain._
+import uk.gov.hmrc.mongo.MongoSpecSupport
+import uk.gov.hmrc.mongo.json.ReactiveMongoFormats.dateTimeFormats
 import uk.gov.hmrc.play.it.Port
 import uk.gov.hmrc.play.it.UrlHelper.-/
 import uk.gov.hmrc.play.test.{UnitSpec, WithFakeApplication}
+import uk.gov.hmrc.time
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Random
-
 
 class CreateMessageSpec extends UnitSpec
   with WithFakeApplication
@@ -44,6 +50,8 @@ class CreateMessageSpec extends UnitSpec
   with BeforeAndAfterAll
   with BeforeAndAfterEach
   with MockitoSugar
+  with MongoSpecSupport
+  with LoneElement
   with TableDrivenPropertyChecks {
 
   override def beforeAll() = {
@@ -60,10 +68,10 @@ class CreateMessageSpec extends UnitSpec
     messageService.stop()
   }
 
-
   override protected def beforeEach(): Unit = {
     super.beforeEach()
-    DateTimeUtils.setCurrentMillisFixed(1000L)
+    DateTimeUtils.setCurrentMillisFixed(fixedDateTime.getMillis)
+    await(mongo().collection[JSONCollection]("messageBodies").drop())
   }
 
   override protected def afterEach() = {
@@ -73,6 +81,7 @@ class CreateMessageSpec extends UnitSpec
     DateTimeUtils.setCurrentMillisSystem()
   }
 
+  val fixedDateTime = time.DateTimeUtils.now
   private val appPort = Port.randomAvailable
 
   val auth = new AuthServiceMock()
@@ -89,10 +98,10 @@ class CreateMessageSpec extends UnitSpec
     Nino(f"$prefix$number%06d$suffix")
   }
 
-  def messageFor(taxId: TaxIdWithName,
-                 regime: String,
-                 statutory: Option[Boolean] = Some(true)) = {
-    Message(
+  def messageHeaderFor(taxId: TaxIdWithName,
+                       regime: String,
+                       statutory: Option[Boolean] = Some(true)) = {
+    MessageHeader(
       Recipient(regime, taxId),
       s"Message for recipient: $regime - ${taxId.value}",
       hash = "messageHash",
@@ -115,7 +124,8 @@ class CreateMessageSpec extends UnitSpec
     additionalConfiguration = Map(
       "appName" -> "application-name",
       "appUrl" -> "http://microservice-name.service",
-      "auditing.enabled" -> "false"
+      "auditing.enabled" -> "false",
+      "mongodb.uri" -> mongoUri
     ) ++ messageService.configuration
   )
 
@@ -124,20 +134,15 @@ class CreateMessageSpec extends UnitSpec
   val fakeGetRequest = FakeRequest("GET", "/").withHeaders((HttpHeaders.AUTHORIZATION, auth.token))
   val fakePostRequest = FakeRequest("POST", "/").withHeaders((HttpHeaders.AUTHORIZATION, auth.token))
 
-  def messageCreationRequestFor(message: Message): String = {
+  def messageCreationRequestFor(message: MessageHeader): String = {
     val json = Json.obj(
       "regime" -> message.recipient.regime,
       "taxId" -> Json.obj(
         "name" -> message.recipient.taxId.name,
         "value" -> message.recipient.taxId.value
       )
-    )
-    if(message.statutory.isDefined) {
-      (json + ("statutory", JsBoolean(message.statutory.get))).toString
-    }
-    else {
-      json.toString
-    }
+    ) ++ message.statutory.fold(Json.obj())(s => Json.obj("statutory" -> s))
+    json.toString
   }
 
   def appPath(path: String) = {
@@ -153,35 +158,62 @@ class CreateMessageSpec extends UnitSpec
       post(creationRequest)
   }
 
-  val messages = Table(
-    "message",
-    messageFor(randomUtr, "sa", statutory = Some(true)),
-    messageFor(randomUtr, "sa", statutory = Some(false)),
-    messageFor(randomNino, "paye", statutory = None)
+  val messageHeaders = Table(
+    "messageHeaders",
+    messageHeaderFor(randomUtr, "sa", statutory = Some(true)),
+    messageHeaderFor(randomUtr, "sa", statutory = Some(false)),
+    messageHeaderFor(randomNino, "paye", statutory = None)
   )
 
-  forAll(messages) { (message) =>
-    "POST /messages" should {
-      s"return 201 if the message is newly created for ${message.recipient.taxId.name} with statutory ${message.statutory.getOrElse("None")}" in {
-        messageService.successfullyCreates(message)
+  import play.api.libs.json._
+
+  "POST /messages" should {
+    forAll(messageHeaders) { (messageHeader) =>
+      s"return 201 if the messageHeader is newly created for ${messageHeader.recipient.taxId.name} with statutory ${messageHeader.statutory.getOrElse("None")}" in {
+        messageService.successfullyCreates(messageHeader)
 
         val response = callCreateMessageWith(
-          messageCreationRequestFor(message)
+          messageCreationRequestFor(messageHeader)
         )
 
         response.futureValue.status shouldBe Status.CREATED
-        messageService.receivedMessageCreateRequestFor(message)
+        (response.futureValue.json \ "message" \ "body" \ "id").asOpt[String] shouldBe defined
+        messageService.receivedMessageCreateRequestFor(messageHeader)
       }
 
-      s"return 200 if the message has been already created before for ${message.recipient.taxId.name} with statutory ${message.statutory.getOrElse("None")}" in {
-        messageService.returnsDuplicateExistsFor(message)
+      s"return 200 if the messageHeader has been already created before for ${messageHeader.recipient.taxId.name} with statutory ${messageHeader.statutory.getOrElse("None")}" in {
+        messageService.returnsDuplicateExistsFor(messageHeader)
 
         val response = callCreateMessageWith(
-          messageCreationRequestFor(message)
+          messageCreationRequestFor(messageHeader)
         )
 
         response.futureValue.status shouldBe Status.OK
-        messageService.receivedMessageCreateRequestFor(message)
+        (response.futureValue.json \ "message" \ "body" \ "id").asOpt[String] shouldBe defined
+        messageService.receivedMessageCreateRequestFor(messageHeader)
+      }
+
+      s"stores the messageHeader body in its own collection ${messageHeader.recipient.taxId.name} with statutory ${messageHeader.statutory.getOrElse("None")}" in {
+        messageService.successfullyCreates(messageHeader)
+
+        val response = callCreateMessageWith(
+          messageCreationRequestFor(messageHeader)
+        )
+
+        response.futureValue.status shouldBe Status.CREATED
+
+        val messageBodies = mongo().collection[JSONCollection]("messageBodies").
+          find(Json.obj()).
+          cursor[JsValue]().
+          collect[Seq]()
+
+        messageBodies.futureValue.loneElement shouldBe Json.obj(
+          "_id" -> BSONObjectID(
+            (response.futureValue.json \ "message" \ "body" \ "id").as[String]
+          ),
+          "content" -> "<div>This is a generated message.</div>",
+          "createdAt" -> fixedDateTime
+        )
       }
     }
   }
