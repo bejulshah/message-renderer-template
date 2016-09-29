@@ -41,11 +41,13 @@ trait MessageRendererController extends BaseController {
   def newMessage() = Action.async(parse.json) {
     implicit request =>
       withJsonBody[MessageCreationRequest] { messageCreationRequest =>
-        val newMessage = messageCreationRequest.generateMessage()
+        val newMessageHeader = messageCreationRequest.generateMessage()
 
-        messageBodyRepository.addNewMessageBodyWith(content = "<div>This is a generated message.</div>").
+        messageBodyRepository.addNewMessageBodyWith(
+          content = s"<div>This is a message that has been generated for user with ${newMessageHeader.recipient.taxId.name} value of ${newMessageHeader.recipient.taxId.value}.</div>"
+        ).
           flatMap { messageBody =>
-            messageHeaderRepository.add(newMessage).
+            messageHeaderRepository.add(newMessageHeader).
               map {
                 case MessageAdded => Created(responseWith(messageBody.id))
                 case DuplicateMessage => Ok(responseWith(messageBody.id))

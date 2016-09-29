@@ -216,7 +216,7 @@ class CreateMessageSpec extends UnitSpec
           "_id" -> BSONObjectID(
             (response.futureValue.json \ "message" \ "body" \ "id").as[String]
           ),
-          "content" -> "<div>This is a generated message.</div>",
+          "content" -> s"<div>This is a message that has been generated for user with ${messageHeader.recipient.taxId.name} value of ${messageHeader.recipient.taxId.value}.</div>",
           "createdAt" -> fixedDateTime
         )
       }
