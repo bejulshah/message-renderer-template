@@ -54,6 +54,12 @@ trait MessageRendererController extends BaseController {
       }
   }
 
+  def render(id: MessageBodyId) = Action.async { implicit request =>
+    messageBodyRepository.findBy(id).map {
+      _.fold(_ => NotFound, body => Ok(body.content))
+    }
+  }
+
   private def responseWith(messageBodyId: MessageBodyId) = Json.obj(
     "message" -> Json.obj(
       "body" -> Json.obj(
@@ -61,4 +67,9 @@ trait MessageRendererController extends BaseController {
       )
     )
   )
+}
+
+object Binders {
+  implicit def messageBodyIdBinder(implicit stringBinder: PathBindable[String]): PathBindable[MessageBodyId] =
+    stringBinder.transform[MessageBodyId](MessageBodyId(_), _.value)
 }

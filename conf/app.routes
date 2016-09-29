@@ -1,4 +1,5 @@
 # microservice specific routes
 
-POST        /messages                                          uk.gov.hmrc.messagerenderertemplate.controllers.MessageRendererController.newMessage()
+POST    /messages      uk.gov.hmrc.messagerenderertemplate.controllers.MessageRendererController.newMessage()
 
+GET     /messages/:id  uk.gov.hmrc.messagerenderertemplate.controllers.MessageRendererController.render(id: uk.gov.hmrc.messagerenderertemplate.domain.MessageBodyId)

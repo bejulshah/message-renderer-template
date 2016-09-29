@@ -30,13 +30,14 @@ import reactivemongo.bson.BSONObjectID
 import reactivemongo.json.ImplicitBSONHandlers._
 import reactivemongo.json.collection.JSONCollection
 import uk.gov.hmrc.domain.TaxIds.TaxIdWithName
+import uk.gov.hmrc.play.http.test.ResponseMatchers.{status => statusOf, _}
 import uk.gov.hmrc.domain.{Nino, SaUtr}
 import uk.gov.hmrc.messagerenderertemplate.acceptance.microservices.{AuthServiceMock, MessageServiceMock}
 import uk.gov.hmrc.messagerenderertemplate.domain._
+import uk.gov.hmrc.messagerenderertemplate.persistence.model.MessageBodyPersistenceModel
 import uk.gov.hmrc.mongo.MongoSpecSupport
 import uk.gov.hmrc.mongo.json.ReactiveMongoFormats.dateTimeFormats
 import uk.gov.hmrc.play.it.Port
-import uk.gov.hmrc.play.it.UrlHelper.-/
 import uk.gov.hmrc.play.test.{UnitSpec, WithFakeApplication}
 import uk.gov.hmrc.time
 
@@ -146,17 +147,21 @@ class CreateMessageSpec extends UnitSpec
   }
 
   def appPath(path: String) = {
-    s"http://localhost:$appPort/message-renderer-template/${-/(path)}"
+    s"http://localhost:$appPort/message-renderer-template$path"
   }
 
   def callCreateMessageWith(creationRequest: String) = {
-    WS.url(appPath(s"/messages")).
+    WS.url(appPath("/messages")).
       withHeaders(
-        (HttpHeaders.AUTHORIZATION, auth.token),
         (HttpHeaders.CONTENT_TYPE, "application/json")
       ).
       post(creationRequest)
   }
+
+  def getMessageBy(id: MessageBodyId) =
+    WS.url(appPath(s"/messages/${id.value}")).
+      withHeaders(HttpHeaders.AUTHORIZATION -> auth.token).
+      get()
 
   val messageHeaders = Table(
     "messageHeaders",
@@ -216,5 +221,31 @@ class CreateMessageSpec extends UnitSpec
         )
       }
     }
+  }
+
+  "GET /messages/:id" should {
+
+    "render a message when provided a valid ID" in {
+      val messageBody: MessageBody = messageBodyHasBeenPersistedWith("<div>this is an example content</div>")
+
+      getMessageBy(messageBody.id) should have(
+        body(messageBody.content),
+        statusOf(200)
+      )
+    }
+
+    "return a 404 when provided an invalid ID" in {
+      getMessageBy(MessageBodyId(BSONObjectID.generate.stringify)) should have(
+        statusOf(404)
+      )
+    }
+  }
+
+  def messageBodyHasBeenPersistedWith(content: String): MessageBody = {
+    val msg = MessageBodyPersistenceModel.createNewWith(content)
+    await(
+      mongo().collection[JSONCollection]("messageBodies").insert(Json.toJson(msg).as[JsObject])
+    ).n shouldBe 1
+    msg.toMessageBody()
   }
 }

@@ -16,10 +16,11 @@
 
 package uk.gov.hmrc.messagerenderertemplate.persistence
 
+import play.api.Logger
 import reactivemongo.api.DB
 import reactivemongo.api.commands.WriteResult
 import reactivemongo.bson.BSONObjectID
-import uk.gov.hmrc.messagerenderertemplate.domain.{MessageBody, MessageBodyRepository}
+import uk.gov.hmrc.messagerenderertemplate.domain.{BodyNotFound, MessageBody, MessageBodyId, MessageBodyRepository}
 import uk.gov.hmrc.messagerenderertemplate.persistence.model.MessageBodyPersistenceModel
 import uk.gov.hmrc.mongo.ReactiveRepository
 import uk.gov.hmrc.mongo.json.ReactiveMongoFormats
@@ -38,10 +39,20 @@ class MongoMessageBodyRepository(implicit mongo: () => DB)
     val messageBodyPersistenceModel = MessageBodyPersistenceModel.createNewWith(content)
 
     insert(messageBodyPersistenceModel).map { (result: WriteResult) =>
-      if (result.inError) {
-        throw new RuntimeException("Error with insert")
-      }
       messageBodyPersistenceModel.toMessageBody()
     }
   }
+
+  override def findBy(id: MessageBodyId)(implicit ec: ExecutionContext): Future[Either[BodyNotFound.type, MessageBody]] =
+    Future.fromTry(BSONObjectID.parse(id.value)).flatMap { bsonID =>
+      Logger.error(s"findBy bson object id --> ${bsonID.stringify}")
+      findById(bsonID).map { result =>
+        Logger.error(s"found --> ${bsonID.stringify} as $result")
+        result match {
+
+          case Some(model) => Right(model.toMessageBody())
+          case None => Left(BodyNotFound)
+        }
+      }
+    }
 }

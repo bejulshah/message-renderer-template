@@ -21,9 +21,7 @@ import play.modules.reactivemongo.ReactiveMongoPlugin
 
 package object persistence {
 
-  private implicit val connection = ReactiveMongoPlugin.mongoConnector.db
+  private implicit def connection = ReactiveMongoPlugin.mongoConnector.db
 
-  lazy val MongoMessageBodyRepository = new MongoMessageBodyRepository {
-    def mongo = connection
-  }
+  lazy val MongoMessageBodyRepository = new MongoMessageBodyRepository
 }

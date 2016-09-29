@@ -24,12 +24,12 @@ import uk.gov.hmrc.messagerenderertemplate.domain.{MessageBody, MessageBodyId}
 import uk.gov.hmrc.mongo.json.ReactiveMongoFormats
 import uk.gov.hmrc.time.DateTimeUtils
 
-case class MessageBodyPersistenceModel(id: BSONObjectID,
+case class MessageBodyPersistenceModel(_id: BSONObjectID,
                                        content: String,
                                        createdAt: DateTime) {
   def toMessageBody(): MessageBody = {
     MessageBody(
-      id = MessageBodyId(id.stringify),
+      id = MessageBodyId(_id.stringify),
       content = content
     )
   }
@@ -38,23 +38,13 @@ case class MessageBodyPersistenceModel(id: BSONObjectID,
 object MessageBodyPersistenceModel {
   def createNewWith(content: String) = {
     MessageBodyPersistenceModel(
-      id = BSONObjectID.generate,
+      _id = BSONObjectID.generate,
       content = content,
       createdAt = DateTimeUtils.now
     )
   }
 
-  implicit val formats = ReactiveMongoFormats.mongoEntity({
-    implicit val dateReads = ReactiveMongoFormats.dateTimeRead
-    implicit val dateWrites = ReactiveMongoFormats.dateTimeWrite
-    implicit val objectIdFormats = ReactiveMongoFormats.objectIdFormats
-
-    implicit val reads = (
-      (__ \ "_id").read[BSONObjectID] and
-        (__ \ "body").read[String] and
-        (__ \ "createdAt").read[DateTime]
-      ) (MessageBodyPersistenceModel.apply _)
-
-    Format(reads, Json.writes[MessageBodyPersistenceModel])
-  })
+  implicit val dateReads: Format[DateTime] = ReactiveMongoFormats.dateTimeFormats
+  implicit val objectIdFormats: Format[BSONObjectID] = ReactiveMongoFormats.objectIdFormats
+  implicit val formats: Format[MessageBodyPersistenceModel] = Json.format[MessageBodyPersistenceModel]
 }
