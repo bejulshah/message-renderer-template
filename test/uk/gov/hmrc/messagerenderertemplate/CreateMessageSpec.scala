@@ -235,11 +235,18 @@ class CreateMessageSpec extends UnitSpec
       )
     }
 
-    "return a 404 when provided an invalid ID" in {
+    "return a 404 when provided a missing ID" in {
       getMessageBy(MessageBodyId(BSONObjectID.generate.stringify)) should have(
         statusOf(404)
       )
     }
+
+    "return a 400 when provided an invalid ID" in {
+      getMessageBy(MessageBodyId("hello")) should have(
+        statusOf(400)
+      )
+    }
+
   }
 
   def messageBodyHasBeenPersistedWith(content: String): MessageBody = {
