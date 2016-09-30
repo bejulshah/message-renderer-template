@@ -47,7 +47,7 @@ trait MessageRendererController extends BaseController {
           content = s"<div>This is a message that has been generated for user with ${newMessageHeader.recipient.taxId.name} value of ${newMessageHeader.recipient.taxId.value}.</div>"
         ).
           flatMap { messageBody =>
-            messageHeaderRepository.add(newMessageHeader).
+            messageHeaderRepository.add(newMessageHeader, messageBody.id).
               map {
                 case MessageAdded => Created(responseWith(messageBody.id))
                 case DuplicateMessage => Ok(responseWith(messageBody.id))

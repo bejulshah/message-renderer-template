@@ -27,6 +27,7 @@ case object DuplicateMessage extends AddingResult
 
 trait MessageHeaderRepository {
 
-  def add(messageHeader: MessageHeader)(implicit hc: HeaderCarrier): Future[AddingResult]
+  def add(messageHeader: MessageHeader, messageBodyId: MessageBodyId)
+         (implicit hc: HeaderCarrier): Future[AddingResult]
 
 }

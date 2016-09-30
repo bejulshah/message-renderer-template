@@ -182,8 +182,9 @@ class CreateMessageSpec extends UnitSpec
         )
 
         response.futureValue.status shouldBe Status.CREATED
-        (response.futureValue.json \ "message" \ "body" \ "id").asOpt[String] shouldBe defined
-        messageService.receivedMessageCreateRequestFor(messageHeader)
+        val messageBodyId = (response.futureValue.json \ "message" \ "body" \ "id").asOpt[String]
+        messageBodyId shouldBe defined
+        messageService.receivedMessageCreateRequestFor(messageHeader, MessageBodyId(messageBodyId.get))
       }
 
       s"return 200 if the messageHeader has been already created before for ${messageHeader.recipient.taxId.name} with statutory ${messageHeader.statutory.getOrElse("None")}" in {
@@ -193,9 +194,9 @@ class CreateMessageSpec extends UnitSpec
           messageCreationRequestFor(messageHeader)
         )
 
-        response.futureValue.status shouldBe Status.OK
-        (response.futureValue.json \ "message" \ "body" \ "id").asOpt[String] shouldBe defined
-        messageService.receivedMessageCreateRequestFor(messageHeader)
+        val messageBodyId = (response.futureValue.json \ "message" \ "body" \ "id").asOpt[String]
+        messageBodyId shouldBe defined
+        messageService.receivedMessageCreateRequestFor(messageHeader, MessageBodyId(messageBodyId.get))
       }
 
       s"stores the messageHeader body in its own collection ${messageHeader.recipient.taxId.name} with statutory ${messageHeader.statutory.getOrElse("None")}" in {

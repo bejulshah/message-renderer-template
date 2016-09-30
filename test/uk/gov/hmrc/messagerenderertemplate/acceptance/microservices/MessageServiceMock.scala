@@ -18,15 +18,14 @@ package uk.gov.hmrc.messagerenderertemplate.acceptance.microservices
 
 import com.github.tomakehurst.wiremock.client.WireMock._
 import play.api.http.Status
-import play.api.libs.json.Json
-import uk.gov.hmrc.messagerenderertemplate.domain.MessageHeader
+import uk.gov.hmrc.messagerenderertemplate.domain.{MessageBodyId, MessageHeader}
 
 class MessageServiceMock(authToken: String, servicePort: Int = 8910)
   extends WiremockService("message", servicePort) {
 
-  def receivedMessageCreateRequestFor(messageHeader: MessageHeader): Unit = {
+  def receivedMessageCreateRequestFor(messageHeader: MessageHeader, messageBodyId: MessageBodyId): Unit = {
     service.verifyThat(postRequestedFor(urlEqualTo("/messages")).
-      withRequestBody(equalToJson(jsonFor(messageHeader)))
+      withRequestBody(equalToJson(jsonFor(messageHeader, messageBodyId)))
     )
   }
 
@@ -40,19 +39,23 @@ class MessageServiceMock(authToken: String, servicePort: Int = 8910)
       willReturn(aResponse().withStatus(Status.CONFLICT)))
   }
 
-  private def jsonFor(messageHeader: MessageHeader): String = {
-    Json.prettyPrint(
-      Json.obj(
-        "recipient" -> Json.obj(
-          "regime" -> messageHeader.recipient.regime,
-          "identifier" -> Json.obj(
-            messageHeader.recipient.taxId.name -> messageHeader.recipient.taxId.value
-          )
-        ),
-        "subject" -> messageHeader.subject,
-        "hash" -> messageHeader.hash
-      ) ++ messageHeader.statutory.fold(Json.obj())(s => Json.obj("statutory" -> s))
-
-    )
+  private def jsonFor(messageHeader: MessageHeader, messageBodyId: MessageBodyId): String = {
+    s"""
+       | {
+       |   ${messageHeader.statutory.fold("")(value => s""""statutory": $value,""")}
+       |   "recipient": {
+       |     "regime": "${messageHeader.recipient.regime}",
+       |     "identifier": {
+       |       "${messageHeader.recipient.taxId.name}": "${messageHeader.recipient.taxId.value}"
+       |     }
+       |   },
+       |   "subject": "${messageHeader.subject}",
+       |   "hash": "${messageHeader.hash}",
+       |   "renderUrl": {
+       |     "service": "message-renderer-template",
+       |     "url": "/message-renderer-template/messages/${messageBodyId.value}"
+       |   }
+       | }
+       | """.stripMargin
   }
 }

@@ -22,34 +22,45 @@ import uk.gov.hmrc.messagerenderertemplate.domain._
 import uk.gov.hmrc.play.config.ServicesConfig
 import uk.gov.hmrc.play.http.logging.MdcLoggingExecutionContext._
 import uk.gov.hmrc.play.http.{HeaderCarrier, HttpGet, HttpPost, Upstream4xxResponse}
+import uk.gov.hmrc.messagerenderertemplate.controllers.routes
 
 import scala.concurrent.Future
 
 
 class MessageHeaderServiceConnector extends MessageHeaderRepository with ServicesConfig {
+  type Message = (MessageBodyId, MessageHeader)
+
   def http: HttpGet with HttpPost = WSHttp
 
   val messageBaseUrl: String = baseUrl("message")
 
   import play.api.libs.json._
 
-  private implicit val messageWrites: Writes[MessageHeader] = new Writes[MessageHeader] {
-    override def writes(messageHeader: MessageHeader) = {
-      Json.obj(
-        "recipient" -> Json.obj(
-          "regime" -> messageHeader.recipient.regime,
-          "identifier" -> Json.obj(
-            messageHeader.recipient.taxId.name -> messageHeader.recipient.taxId.value
+  private implicit val messageWrites: Writes[Message] =
+    new Writes[Message] {
+      override def writes(message: Message) = {
+        val (id, messageHeader) = message
+        Json.obj(
+          "recipient" -> Json.obj(
+            "regime" -> messageHeader.recipient.regime,
+            "identifier" -> Json.obj(
+              messageHeader.recipient.taxId.name -> messageHeader.recipient.taxId.value
+            )
+          ),
+          "subject" -> messageHeader.subject,
+          "hash" -> messageHeader.hash,
+          "renderUrl" -> Json.obj(
+            "service" -> "message-renderer-template",
+            "url" -> s"${routes.MessageRendererController.render(id).url}"
           )
-        ),
-        "subject" -> messageHeader.subject,
-        "hash" -> messageHeader.hash
-      ) ++ messageHeader.statutory.fold(Json.obj())(s => Json.obj("statutory" -> s))
+        ) ++ messageHeader.statutory.fold(Json.obj())(s => Json.obj("statutory" -> s))
+      }
     }
-  }
 
-  override def add(messageHeader: MessageHeader)(implicit hc: HeaderCarrier): Future[AddingResult] = {
-    http.POST(s"$messageBaseUrl/messages", messageHeader).
+  override def add(messageHeader: MessageHeader, messageBodyId: MessageBodyId)
+                  (implicit hc: HeaderCarrier): Future[AddingResult] = {
+
+    http.POST(s"$messageBaseUrl/messages", (messageBodyId, messageHeader)).
       map { response =>
         response.status match {
           case Status.OK => MessageAdded
