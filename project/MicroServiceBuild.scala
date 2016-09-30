@@ -1,16 +1,13 @@
 import play.PlayImport.PlayKeys._
 import sbt._
-import uk.gov.hmrc.SbtAutoBuildPlugin
-import uk.gov.hmrc.sbtdistributables.SbtDistributablesPlugin
-import uk.gov.hmrc.versioning.SbtGitVersioning
 
 object MicroServiceBuild extends Build with MicroService {
   val appName = "message-renderer-template"
   override lazy val appDependencies: Seq[ModuleID] = AppDependencies()
-  override lazy val playSettings = Seq(routesImport ++= Seq(
-    "uk.gov.hmrc.messagerenderertemplate._",
-    "uk.gov.hmrc.messagerenderertemplate.domain._"
-  ))
+  override lazy val playSettings = Seq(
+    routesImport ++= Seq("uk.gov.hmrc.messagerenderertemplate.domain._",
+                         "uk.gov.hmrc.messagerenderertemplate.controllers.binders._")
+  )
 }
 
 private object AppDependencies {

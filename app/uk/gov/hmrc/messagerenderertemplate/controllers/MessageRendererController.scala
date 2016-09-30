@@ -70,8 +70,3 @@ trait MessageRendererController extends BaseController {
     )
   )
 }
-
-object Binders {
-  implicit def messageBodyIdBinder(implicit stringBinder: PathBindable[String]): PathBindable[MessageBodyId] =
-    stringBinder.transform[MessageBodyId](MessageBodyId(_), _.value)
-}
