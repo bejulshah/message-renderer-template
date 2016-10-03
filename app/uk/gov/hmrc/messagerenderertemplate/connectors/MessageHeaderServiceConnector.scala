@@ -20,6 +20,8 @@ import java.security.MessageDigest
 
 import org.apache.commons.codec.binary.Base64
 import play.api.http.Status
+import play.api.libs.json.{Format, Json, Writes}
+import uk.gov.hmrc.domain.TaxIds.TaxIdWithName
 import uk.gov.hmrc.messagerenderertemplate.WSHttp
 import uk.gov.hmrc.messagerenderertemplate.domain._
 import uk.gov.hmrc.play.config.ServicesConfig
@@ -29,9 +31,27 @@ import uk.gov.hmrc.messagerenderertemplate.controllers.routes
 
 import scala.concurrent.Future
 
+case class RecipientBody(regime: String, identifier: TaxIdWithName)
+
+case class RenderUrl(service: String, url: String)
+
+case class MessageHeaderCreation(recipient: RecipientBody,
+                                 subject: String,
+                                 hash: String,
+                                 renderUrl: RenderUrl,
+                                 alertDetails: AlertDetails,
+                                 statutory: Option[Boolean])
+
+object MessageHeaderCreationFormats {
+
+}
+
+object MessageHeaderCreation {
+  implicit val messageCreationFormat: Format[MessageHeaderCreation] = Json.format[MessageHeaderCreation]
+}
+
 
 class MessageHeaderServiceConnector extends MessageHeaderRepository with ServicesConfig {
-  type MessageHeaderCreation = (MessageBody, MessageHeader)
 
   def http: HttpGet with HttpPost = WSHttp
 
