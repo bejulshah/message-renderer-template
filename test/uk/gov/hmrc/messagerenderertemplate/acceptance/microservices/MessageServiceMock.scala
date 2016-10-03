@@ -16,16 +16,21 @@
 
 package uk.gov.hmrc.messagerenderertemplate.acceptance.microservices
 
+import java.security.MessageDigest
+
 import com.github.tomakehurst.wiremock.client.WireMock._
+import org.apache.commons.codec.binary.Base64
 import play.api.http.Status
-import uk.gov.hmrc.messagerenderertemplate.domain.{MessageBodyId, MessageHeader}
+import uk.gov.hmrc.messagerenderertemplate.domain.{MessageBody, MessageHeader}
+import uk.gov.hmrc.time.DateTimeUtils
+import uk.gov.hmrc.play.controllers.RestFormats.localDateTimeFormats
 
 class MessageServiceMock(authToken: String, servicePort: Int = 8910)
   extends WiremockService("message", servicePort) {
 
-  def receivedMessageCreateRequestFor(messageHeader: MessageHeader, messageBodyId: MessageBodyId): Unit = {
+  def receivedMessageCreateRequestFor(messageHeader: MessageHeader, messageBody: MessageBody): Unit = {
     service.verifyThat(postRequestedFor(urlEqualTo("/messages")).
-      withRequestBody(equalToJson(jsonFor(messageHeader, messageBodyId)))
+      withRequestBody(equalToJson(jsonFor(messageHeader, messageBody)))
     )
   }
 
@@ -39,7 +44,7 @@ class MessageServiceMock(authToken: String, servicePort: Int = 8910)
       willReturn(aResponse().withStatus(Status.CONFLICT)))
   }
 
-  private def jsonFor(messageHeader: MessageHeader, messageBodyId: MessageBodyId): String = {
+  private def jsonFor(messageHeader: MessageHeader, messageBody: MessageBody): String = {
     s"""
        | {
        |   ${messageHeader.statutory.fold("")(value => s""""statutory": $value,""")}
@@ -50,12 +55,23 @@ class MessageServiceMock(authToken: String, servicePort: Int = 8910)
        |     }
        |   },
        |   "subject": "${messageHeader.subject}",
-       |   "hash": "${messageHeader.hash}",
+       |   "hash": "${hash(Seq("message-renderer-template", messageHeader.subject, messageBody.content))}",
        |   "renderUrl": {
        |     "service": "message-renderer-template",
-       |     "url": "/message-renderer-template/messages/${messageBodyId.value}"
+       |     "url": "/message-renderer-template/messages/${messageBody.id.value}"
+       |   },
+       |   "alertDetails": {
+       |       "templateId": "${messageHeader.alertDetails.templateId}",
+       |       "data": {},
+       |       "alertFrom": "${messageHeader.alertDetails.alertFrom}"
        |   }
        | }
        | """.stripMargin
   }
+
+  private def hash(fields: Seq[String]): String = {
+    val sha256Digester = MessageDigest.getInstance("SHA-256")
+    Base64.encodeBase64String(sha256Digester.digest(fields.mkString("/").getBytes("UTF-8")))
+  }
 }
+

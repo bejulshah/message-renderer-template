@@ -24,6 +24,7 @@ import uk.gov.hmrc.messagerenderertemplate.domain._
 import uk.gov.hmrc.messagerenderertemplate.persistence.MongoMessageBodyRepository
 import uk.gov.hmrc.play.microservice.controller.BaseController
 import uk.gov.hmrc.play.http.logging.MdcLoggingExecutionContext._
+import uk.gov.hmrc.time.DateTimeUtils
 
 object MessageRendererController extends MessageRendererController {
 
@@ -44,10 +45,14 @@ trait MessageRendererController extends BaseController {
         val newMessageHeader = messageCreationRequest.generateMessage()
 
         messageBodyRepository.addNewMessageBodyWith(
-          content = s"<div>This is a message that has been generated for user with ${newMessageHeader.recipient.taxId.name} value of ${newMessageHeader.recipient.taxId.value}.</div>"
+          content =
+            s"""<h1> Message - created at ${DateTimeUtils.now.toString()}</h1>
+                |<div>This is a message that has been generated for user
+                |with ${newMessageHeader.recipient.taxId.name} value of ${newMessageHeader.recipient.taxId.value}.</div>""".
+              stripMargin.replaceAll("\n", " ")
         ).
           flatMap { messageBody =>
-            messageHeaderRepository.add(newMessageHeader, messageBody.id).
+            messageHeaderRepository.add(newMessageHeader, messageBody).
               map {
                 case MessageAdded => Created(responseWith(messageBody.id))
                 case DuplicateMessage => Ok(responseWith(messageBody.id))

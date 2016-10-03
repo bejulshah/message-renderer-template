@@ -44,7 +44,7 @@ import uk.gov.hmrc.time
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Random
 
-class CreateMessageSpec extends UnitSpec
+class CreateAndRenderMessageSpec extends UnitSpec
   with WithFakeApplication
   with ScalaFutures
   with IntegrationPatience
@@ -105,18 +105,22 @@ class CreateMessageSpec extends UnitSpec
     MessageHeader(
       Recipient(regime, taxId),
       s"Message for recipient: $regime - ${taxId.value}",
-      hash = "messageHash",
-      alertDetails = AlertDetails(
-        templateId = "template1234",
-        data = Map(
-          "alertData1" -> "alertValue1",
-          "alertData2" -> "alertValue2"
-        )
-      ),
-      statutory = statutory
+      statutory = statutory,
+      alertDetails = AlertDetails("newMessageAlert", data = Map(), alertFrom = time.DateTimeUtils.now.toLocalDate)
     )
   }
 
+  def messageBodyFor(messageBodyId: String,
+                     messageHeader: MessageHeader) = {
+    MessageBody(
+      id = MessageBodyId(messageBodyId),
+      content =
+        s"""<h1> Message - created at ${time.DateTimeUtils.now.toString()}</h1>
+            |<div>This is a message that has been generated for user
+            |with ${messageHeader.recipient.taxId.name} value of ${messageHeader.recipient.taxId.value}.</div>""".
+          stripMargin.replaceAll("\n", " ")
+    )
+  }
 
   object TestGlobal extends play.api.GlobalSettings
 
@@ -184,7 +188,7 @@ class CreateMessageSpec extends UnitSpec
         response.futureValue.status shouldBe Status.CREATED
         val messageBodyId = (response.futureValue.json \ "message" \ "body" \ "id").asOpt[String]
         messageBodyId shouldBe defined
-        messageService.receivedMessageCreateRequestFor(messageHeader, MessageBodyId(messageBodyId.get))
+        messageService.receivedMessageCreateRequestFor(messageHeader, messageBodyFor(messageBodyId.get, messageHeader))
       }
 
       s"return 200 if the messageHeader has been already created before for ${messageHeader.recipient.taxId.name} with statutory ${messageHeader.statutory.getOrElse("None")}" in {
@@ -196,7 +200,7 @@ class CreateMessageSpec extends UnitSpec
 
         val messageBodyId = (response.futureValue.json \ "message" \ "body" \ "id").asOpt[String]
         messageBodyId shouldBe defined
-        messageService.receivedMessageCreateRequestFor(messageHeader, MessageBodyId(messageBodyId.get))
+        messageService.receivedMessageCreateRequestFor(messageHeader, messageBodyFor(messageBodyId.get, messageHeader))
       }
 
       s"stores the messageHeader body in its own collection ${messageHeader.recipient.taxId.name} with statutory ${messageHeader.statutory.getOrElse("None")}" in {
@@ -213,11 +217,12 @@ class CreateMessageSpec extends UnitSpec
           cursor[JsValue]().
           collect[Seq]()
 
+        val messageBodyId = (response.futureValue.json \ "message" \ "body" \ "id").as[String]
         messageBodies.futureValue.loneElement shouldBe Json.obj(
           "_id" -> BSONObjectID(
-            (response.futureValue.json \ "message" \ "body" \ "id").as[String]
+            messageBodyId
           ),
-          "content" -> s"<div>This is a message that has been generated for user with ${messageHeader.recipient.taxId.name} value of ${messageHeader.recipient.taxId.value}.</div>",
+          "content" -> messageBodyFor(messageBodyId, messageHeader).content,
           "createdAt" -> fixedDateTime
         )
       }

@@ -16,6 +16,9 @@
 
 package uk.gov.hmrc.messagerenderertemplate.connectors
 
+import java.security.MessageDigest
+
+import org.apache.commons.codec.binary.Base64
 import play.api.http.Status
 import uk.gov.hmrc.messagerenderertemplate.WSHttp
 import uk.gov.hmrc.messagerenderertemplate.domain._
@@ -28,7 +31,7 @@ import scala.concurrent.Future
 
 
 class MessageHeaderServiceConnector extends MessageHeaderRepository with ServicesConfig {
-  type Message = (MessageBodyId, MessageHeader)
+  type MessageHeaderCreation = (MessageBody, MessageHeader)
 
   def http: HttpGet with HttpPost = WSHttp
 
@@ -36,10 +39,10 @@ class MessageHeaderServiceConnector extends MessageHeaderRepository with Service
 
   import play.api.libs.json._
 
-  private implicit val messageWrites: Writes[Message] =
-    new Writes[Message] {
-      override def writes(message: Message) = {
-        val (id, messageHeader) = message
+  private implicit val messageWrites: Writes[MessageHeaderCreation] =
+    new Writes[MessageHeaderCreation] {
+      override def writes(message: MessageHeaderCreation) = {
+        val (messageBody, messageHeader) = message
         Json.obj(
           "recipient" -> Json.obj(
             "regime" -> messageHeader.recipient.regime,
@@ -48,19 +51,24 @@ class MessageHeaderServiceConnector extends MessageHeaderRepository with Service
             )
           ),
           "subject" -> messageHeader.subject,
-          "hash" -> messageHeader.hash,
+          "hash" -> hash(Seq("message-renderer-template", messageHeader.subject, messageBody.content)),
           "renderUrl" -> Json.obj(
             "service" -> "message-renderer-template",
-            "url" -> s"${routes.MessageRendererController.render(id).url}"
+            "url" -> s"${routes.MessageRendererController.render(messageBody.id).url}"
+          ),
+          "alertDetails" -> Json.obj(
+            "templateId" -> messageHeader.alertDetails.templateId,
+            "alertFrom" -> messageHeader.alertDetails.alertFrom,
+            "data" -> Json.obj()
           )
         ) ++ messageHeader.statutory.fold(Json.obj())(s => Json.obj("statutory" -> s))
       }
     }
 
-  override def add(messageHeader: MessageHeader, messageBodyId: MessageBodyId)
+  override def add(messageHeader: MessageHeader, messageBody: MessageBody)
                   (implicit hc: HeaderCarrier): Future[AddingResult] = {
 
-    http.POST(s"$messageBaseUrl/messages", (messageBodyId, messageHeader)).
+    http.POST(s"$messageBaseUrl/messages", (messageBody, messageHeader)).
       map { response =>
         response.status match {
           case Status.OK => MessageAdded
@@ -69,6 +77,11 @@ class MessageHeaderServiceConnector extends MessageHeaderRepository with Service
       recover {
         case Upstream4xxResponse(_, Status.CONFLICT, _, _) => DuplicateMessage
       }
+  }
+
+  private def hash(fields: Seq[String]): String = {
+    val sha256Digester = MessageDigest.getInstance("SHA-256")
+    Base64.encodeBase64String(sha256Digester.digest(fields.mkString("/").getBytes("UTF-8")))
   }
 }
 

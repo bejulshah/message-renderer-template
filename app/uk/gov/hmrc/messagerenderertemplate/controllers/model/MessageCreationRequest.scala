@@ -20,14 +20,14 @@ import play.api.libs.functional.syntax._
 import play.api.libs.json._
 import uk.gov.hmrc.domain.{Nino, SaUtr}
 import uk.gov.hmrc.messagerenderertemplate.domain.{AlertDetails, MessageHeader, Recipient}
+import uk.gov.hmrc.time.DateTimeUtils
 
 final case class MessageCreationRequest(regime: String, taxId: TaxId, statutory: Option[Boolean]) {
 
   def generateMessage() = MessageHeader(
     Recipient(regime, taxId.asDomainTaxId),
     subject = s"Message for recipient: $regime - ${taxId.value}",
-    hash = "messageHash",
-    alertDetails = AlertDetails(templateId = "bla", data = Map()),
+    alertDetails = AlertDetails(templateId = "newMessageAlert", data = Map(), alertFrom = DateTimeUtils.now.toLocalDate),
     statutory = statutory
   )
 }
