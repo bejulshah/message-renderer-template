@@ -51,7 +51,7 @@ class MessageServiceMock(authToken: String, servicePort: Int = 8910)
        |   "recipient": {
        |     "regime": "${messageHeader.recipient.regime}",
        |     "identifier": {
-       |       "${messageHeader.recipient.taxId.name}": "${messageHeader.recipient.taxId.value}"
+       |       "${messageHeader.recipient.identifier.name}": "${messageHeader.recipient.identifier.value}"
        |     }
        |   },
        |   "subject": "${messageHeader.subject}",

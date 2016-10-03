@@ -18,23 +18,23 @@ package uk.gov.hmrc.messagerenderertemplate.acceptance.microservices
 
 import com.github.tomakehurst.wiremock.client.WireMock._
 import play.api.libs.json.Json
-import uk.gov.hmrc.messagerenderertemplate.domain.Recipient
+import uk.gov.hmrc.messagerenderertemplate.domain.TaxEntity
 
 class AuthServiceMock extends WiremockService("auth", servicePort = 8500) {
   def token = "authToken9349872"
 
-  def succeedsFor(recipient: Recipient) = {
+  def succeedsFor(recipient: TaxEntity) = {
     service.register(get(urlMatching("/auth/authority*"))
       .willReturn(aResponse().withStatus(200).withBody(jsonFor(recipient))))
   }
 
-  def jsonFor(recipient: Recipient) = {
+  def jsonFor(recipient: TaxEntity) = {
     Json.obj(
       "confidenceLevel" -> 500,
       "uri" -> "testUri",
       "accounts" -> Json.obj(
         recipient.regime -> Json.obj(
-          recipient.taxId.name -> recipient.taxId.value
+          recipient.identifier.name -> recipient.identifier.value
         )
       )
     ).toString()

@@ -19,13 +19,13 @@ package uk.gov.hmrc.messagerenderertemplate.controllers.model
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 import uk.gov.hmrc.domain.{Nino, SaUtr}
-import uk.gov.hmrc.messagerenderertemplate.domain.{AlertDetails, MessageHeader, Recipient}
+import uk.gov.hmrc.messagerenderertemplate.domain.{AlertDetails, MessageHeader, TaxEntity}
 import uk.gov.hmrc.time.DateTimeUtils
 
 final case class MessageCreationRequest(regime: String, taxId: TaxId, statutory: Option[Boolean]) {
 
   def generateMessage() = MessageHeader(
-    Recipient(regime, taxId.asDomainTaxId),
+    TaxEntity(regime, taxId.asDomainTaxId),
     subject = s"Message for recipient: $regime - ${taxId.value}",
     alertDetails = AlertDetails(templateId = "newMessageAlert", data = Map(), alertFrom = DateTimeUtils.now.toLocalDate),
     statutory = statutory
@@ -33,7 +33,7 @@ final case class MessageCreationRequest(regime: String, taxId: TaxId, statutory:
 }
 
 final case class TaxId(name: String, value: String) {
-  def asDomainTaxId = {
+  lazy val asDomainTaxId = {
     name match {
       case "sautr" => SaUtr(value)
       case "nino" => Nino(value)
