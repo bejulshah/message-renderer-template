@@ -103,7 +103,7 @@ class CreateAndRenderMessageSpec extends UnitSpec
                        regime: String,
                        statutory: Option[Boolean] = Some(true)) = {
     MessageHeader(
-      Recipient(regime, taxId),
+      TaxEntity(regime, taxId),
       s"Message for recipient: $regime - ${taxId.value}",
       statutory = statutory,
       alertDetails = AlertDetails("newMessageAlert", data = Map(), alertFrom = time.DateTimeUtils.now.toLocalDate)
@@ -117,8 +117,8 @@ class CreateAndRenderMessageSpec extends UnitSpec
       content =
         s"""<h1> Message - created at ${time.DateTimeUtils.now.toString()}</h1>
             |<div>This is a message that has been generated for user
-            |with ${messageHeader.recipient.taxId.name} value of ${messageHeader.recipient.taxId.value}.</div>""".
-          stripMargin.replaceAll("\n", " ")
+            |with ${messageHeader.recipient.identifier.name} value of ${messageHeader.recipient.identifier.value}.
+            |</div>""".stripMargin.replaceAll("\n", " ")
     )
   }
 
@@ -143,8 +143,8 @@ class CreateAndRenderMessageSpec extends UnitSpec
     val json = Json.obj(
       "regime" -> message.recipient.regime,
       "taxId" -> Json.obj(
-        "name" -> message.recipient.taxId.name,
-        "value" -> message.recipient.taxId.value
+        "name" -> message.recipient.identifier.name,
+        "value" -> message.recipient.identifier.value
       )
     ) ++ message.statutory.fold(Json.obj())(s => Json.obj("statutory" -> s))
     json.toString
@@ -178,7 +178,7 @@ class CreateAndRenderMessageSpec extends UnitSpec
 
   "POST /messages" should {
     forAll(messageHeaders) { (messageHeader) =>
-      s"return 201 if the messageHeader is newly created for ${messageHeader.recipient.taxId.name} with statutory ${messageHeader.statutory.getOrElse("None")}" in {
+      s"return 201 if the messageHeader is newly created for ${messageHeader.recipient.identifier.name} with statutory ${messageHeader.statutory.getOrElse("None")}" in {
         messageService.successfullyCreates(messageHeader)
 
         val response = callCreateMessageWith(
@@ -191,7 +191,7 @@ class CreateAndRenderMessageSpec extends UnitSpec
         messageService.receivedMessageCreateRequestFor(messageHeader, messageBodyFor(messageBodyId.get, messageHeader))
       }
 
-      s"return 200 if the messageHeader has been already created before for ${messageHeader.recipient.taxId.name} with statutory ${messageHeader.statutory.getOrElse("None")}" in {
+      s"return 200 if the messageHeader has been already created before for ${messageHeader.recipient.identifier.name} with statutory ${messageHeader.statutory.getOrElse("None")}" in {
         messageService.returnsDuplicateExistsFor(messageHeader)
 
         val response = callCreateMessageWith(
@@ -203,7 +203,7 @@ class CreateAndRenderMessageSpec extends UnitSpec
         messageService.receivedMessageCreateRequestFor(messageHeader, messageBodyFor(messageBodyId.get, messageHeader))
       }
 
-      s"stores the messageHeader body in its own collection ${messageHeader.recipient.taxId.name} with statutory ${messageHeader.statutory.getOrElse("None")}" in {
+      s"stores the messageHeader body in its own collection ${messageHeader.recipient.identifier.name} with statutory ${messageHeader.statutory.getOrElse("None")}" in {
         messageService.successfullyCreates(messageHeader)
 
         val response = callCreateMessageWith(

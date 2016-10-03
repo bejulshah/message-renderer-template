@@ -48,7 +48,7 @@ trait MessageRendererController extends BaseController {
           content =
             s"""<h1> Message - created at ${DateTimeUtils.now.toString()}</h1>
                 |<div>This is a message that has been generated for user
-                |with ${newMessageHeader.recipient.taxId.name} value of ${newMessageHeader.recipient.taxId.value}.</div>""".
+                |with ${newMessageHeader.recipient.identifier.name} value of ${newMessageHeader.recipient.identifier.value}.</div>""".
               stripMargin.replaceAll("\n", " ")
         ).
           flatMap { messageBody =>

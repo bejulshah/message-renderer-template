@@ -17,11 +17,10 @@
 package uk.gov.hmrc.messagerenderertemplate.domain
 
 import org.joda.time.LocalDate
-import play.api.libs.json.JsValue
 import uk.gov.hmrc.domain.TaxIds.TaxIdWithName
 import uk.gov.hmrc.time.DateTimeUtils
 
-final case class MessageHeader(recipient: Recipient,
+final case class MessageHeader(recipient: TaxEntity,
                                subject: String,
                                statutory: Option[Boolean],
                                alertDetails: AlertDetails,
@@ -29,8 +28,6 @@ final case class MessageHeader(recipient: Recipient,
 
 }
 
-final case class Recipient(regime: String, taxId: TaxIdWithName)
+final case class AlertDetails(templateId: String, data: Map[String, String], alertFrom: LocalDate)
 
-final case class AlertDetails(templateId: String,
-                              data: Map[String, String],
-                              alertFrom: LocalDate)
+final case class TaxEntity(regime: String, identifier: TaxIdWithName)
