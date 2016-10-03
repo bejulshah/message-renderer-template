@@ -17,20 +17,20 @@
 package uk.gov.hmrc.messagerenderertemplate.domain
 
 import org.joda.time.LocalDate
+import play.api.libs.json.JsValue
 import uk.gov.hmrc.domain.TaxIds.TaxIdWithName
 import uk.gov.hmrc.time.DateTimeUtils
 
 final case class MessageHeader(recipient: Recipient,
                                subject: String,
-                               hash: String,
-                               alertDetails: AlertDetails,
                                statutory: Option[Boolean],
+                               alertDetails: AlertDetails,
                                validFrom: LocalDate = DateTimeUtils.now.toLocalDate) {
 
 }
 
+final case class Recipient(regime: String, taxId: TaxIdWithName)
+
 final case class AlertDetails(templateId: String,
                               data: Map[String, String],
-                              alertFrom: LocalDate = LocalDate.now)
-
-final case class Recipient(regime: String, taxId: TaxIdWithName)
+                              alertFrom: LocalDate)
