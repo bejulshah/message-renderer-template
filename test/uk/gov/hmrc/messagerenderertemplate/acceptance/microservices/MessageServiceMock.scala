@@ -22,8 +22,7 @@ import com.github.tomakehurst.wiremock.client.WireMock._
 import org.apache.commons.codec.binary.Base64
 import play.api.http.Status
 import uk.gov.hmrc.messagerenderertemplate.domain.{MessageBody, MessageHeader}
-import uk.gov.hmrc.time.DateTimeUtils
-import uk.gov.hmrc.play.controllers.RestFormats.localDateTimeFormats
+import uk.gov.hmrc.play.controllers.RestFormats.localDateFormats
 
 class MessageServiceMock(authToken: String, servicePort: Int = 8910)
   extends WiremockService("message", servicePort) {
@@ -56,6 +55,7 @@ class MessageServiceMock(authToken: String, servicePort: Int = 8910)
        |   },
        |   "subject": "${messageHeader.subject}",
        |   "hash": "${hash(Seq("message-renderer-template", messageHeader.subject, messageBody.content))}",
+       |   "validFrom": "${messageHeader.validFrom}",
        |   "renderUrl": {
        |     "service": "message-renderer-template",
        |     "url": "/message-renderer-template/messages/${messageBody.id.value}"

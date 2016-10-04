@@ -19,6 +19,7 @@ package uk.gov.hmrc.messagerenderertemplate.connectors
 import java.security.MessageDigest
 
 import org.apache.commons.codec.binary.Base64
+import org.joda.time.LocalDate
 import play.api.http.Status
 import play.api.libs.json._
 import uk.gov.hmrc.domain.TaxIds.TaxIdWithName
@@ -39,6 +40,7 @@ case class MessageHeaderCreation(recipient: TaxEntity,
                                  hash: String,
                                  renderUrl: RenderUrl,
                                  alertDetails: AlertDetails,
+                                 validFrom: LocalDate,
                                  statutory: Option[Boolean])
 object MessageHeaderCreation {
   def create(serviceName: String, header: MessageHeader, body: MessageBody) =
@@ -48,6 +50,7 @@ object MessageHeaderCreation {
       hash(Seq(serviceName, header.subject, body.content)),
       RenderUrl(serviceName, s"${routes.MessageRendererController.render(body.id).url}"),
       header.alertDetails,
+      header.validFrom,
       header.statutory
     )
 
