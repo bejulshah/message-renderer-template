@@ -99,29 +99,6 @@ class CreateAndRenderMessageSpec extends UnitSpec
     Nino(f"$prefix$number%06d$suffix")
   }
 
-  def messageHeaderFor(taxId: TaxIdWithName,
-                       regime: String,
-                       statutory: Option[Boolean] = Some(true)) = {
-    MessageHeader(
-      TaxEntity(regime, taxId),
-      s"Message for recipient: $regime - ${taxId.value}",
-      statutory = statutory,
-      alertDetails = AlertDetails("newMessageAlert", data = Map(), alertFrom = time.DateTimeUtils.now.toLocalDate)
-    )
-  }
-
-  def messageBodyFor(messageBodyId: String,
-                     messageHeader: MessageHeader) = {
-    MessageBody(
-      id = MessageBodyId(messageBodyId),
-      content =
-        s"""<h1> Message - created at ${time.DateTimeUtils.now.toString()}</h1>
-            |<div>This is a message that has been generated for user
-            |with ${messageHeader.recipient.identifier.name} value of ${messageHeader.recipient.identifier.value}.
-            |</div>""".stripMargin.replaceAll("\n", " ")
-    )
-  }
-
   object TestGlobal extends play.api.GlobalSettings
 
   implicit val app = FakeApplication(
@@ -135,6 +112,30 @@ class CreateAndRenderMessageSpec extends UnitSpec
   )
 
   val appServer = TestServer(appPort, app)
+
+  def messageHeaderFor(taxId: TaxIdWithName,
+                       regime: String,
+                       statutory: Option[Boolean] = Some(true)) = {
+    MessageHeader(
+      TaxEntity(regime, taxId),
+      s"Auto generated test message",
+      statutory = statutory,
+      alertDetails = AlertDetails("newMessageAlert", data = Map(), alertFrom = time.DateTimeUtils.now.toLocalDate)
+    )
+  }
+
+  def messageBodyFor(messageBodyId: String,
+                     messageHeader: MessageHeader) = {
+    MessageBody(
+      id = MessageBodyId(messageBodyId),
+      content =
+        s"""<h2>${messageHeader.subject}</h2>
+            |<div>Created at ${time.DateTimeUtils.now.toString()}</div>
+            |<div>This is a message that has been generated for user from ${messageHeader.recipient.regime}
+            |with ${messageHeader.recipient.identifier.name} value of ${messageHeader.recipient.identifier.value}.
+            |</div>""".stripMargin.replaceAll("\n", " ")
+    )
+  }
 
   val fakeGetRequest = FakeRequest("GET", "/").withHeaders((HttpHeaders.AUTHORIZATION, auth.token))
   val fakePostRequest = FakeRequest("POST", "/").withHeaders((HttpHeaders.AUTHORIZATION, auth.token))

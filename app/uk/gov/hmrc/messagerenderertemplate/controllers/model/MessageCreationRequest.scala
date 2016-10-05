@@ -26,7 +26,7 @@ final case class MessageCreationRequest(regime: String, taxId: TaxId, statutory:
 
   def generateMessage() = MessageHeader(
     TaxEntity(regime, taxId.asDomainTaxId),
-    subject = s"Message for recipient: $regime - ${taxId.value}",
+    subject = s"Auto generated test message",
     alertDetails = AlertDetails(templateId = "newMessageAlert", data = Map(), alertFrom = DateTimeUtils.now.toLocalDate),
     statutory = statutory
   )

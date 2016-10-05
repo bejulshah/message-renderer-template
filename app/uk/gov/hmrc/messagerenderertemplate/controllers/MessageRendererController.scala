@@ -46,8 +46,9 @@ trait MessageRendererController extends BaseController {
 
         messageBodyRepository.addNewMessageBodyWith(
           content =
-            s"""<h1> Message - created at ${DateTimeUtils.now.toString()}</h1>
-                |<div>This is a message that has been generated for user
+            s"""<h2>${newMessageHeader.subject}</h2>
+                |<div>Created at ${DateTimeUtils.now.toString()}</div>
+                |<div>This is a message that has been generated for user from ${newMessageHeader.recipient.regime}
                 |with ${newMessageHeader.recipient.identifier.name} value of ${newMessageHeader.recipient.identifier.value}.
                 |</div>""".stripMargin.replaceAll("\n", " ")
         ).
