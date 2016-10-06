@@ -43,6 +43,15 @@ class MessageServiceMock(authToken: String, servicePort: Int = 8910)
   }
 
   private def jsonFor(messageHeader: MessageHeader, messageBody: MessageBody): String = {
+    def hash: String = {
+      val fields = Seq(messageHeader.recipient.regime,
+        messageHeader.recipient.identifier.name,
+        messageHeader.recipient.identifier.value,
+        "message-renderer-template", messageHeader.subject, messageBody.content)
+      val sha256Digester = MessageDigest.getInstance("SHA-256")
+      Base64.encodeBase64String(sha256Digester.digest(fields.mkString("/").getBytes("UTF-8")))
+    }
+
     s"""
        | {
        |   ${messageHeader.statutory.fold("")(value => s""""statutory": $value,""")}
@@ -53,7 +62,7 @@ class MessageServiceMock(authToken: String, servicePort: Int = 8910)
        |     }
        |   },
        |   "subject": "${messageHeader.subject}",
-       |   "hash": "${hash(Seq("message-renderer-template", messageHeader.subject, messageBody.content))}",
+       |   "hash": "${hash}",
        |   "validFrom": "${messageHeader.validFrom}",
        |   "renderUrl": {
        |     "service": "message-renderer-template",
@@ -68,9 +77,5 @@ class MessageServiceMock(authToken: String, servicePort: Int = 8910)
        | """.stripMargin
   }
 
-  private def hash(fields: Seq[String]): String = {
-    val sha256Digester = MessageDigest.getInstance("SHA-256")
-    Base64.encodeBase64String(sha256Digester.digest(fields.mkString("/").getBytes("UTF-8")))
-  }
 }
 
