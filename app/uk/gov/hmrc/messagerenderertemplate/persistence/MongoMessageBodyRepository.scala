@@ -20,6 +20,7 @@ import play.api.Logger
 import reactivemongo.api.DB
 import reactivemongo.api.commands.WriteResult
 import reactivemongo.bson.BSONObjectID
+import uk.gov.hmrc.domain.TaxIds.TaxIdWithName
 import uk.gov.hmrc.messagerenderertemplate.domain.{BodyNotFound, MessageBody, MessageBodyId, MessageBodyRepository}
 import uk.gov.hmrc.messagerenderertemplate.persistence.model.MessageBodyPersistenceModel
 import uk.gov.hmrc.mongo.ReactiveRepository
@@ -35,8 +36,8 @@ class MongoMessageBodyRepository(implicit mongo: () => DB)
     ReactiveMongoFormats.objectIdFormats
   ) with MessageBodyRepository {
 
-  override def addNewMessageBodyWith(content: String)(implicit ec: ExecutionContext): Future[MessageBody] = {
-    val messageBodyPersistenceModel = MessageBodyPersistenceModel.createNewWith(content)
+  override def addNewMessageBodyWith(taxId: TaxIdWithName, content: String)(implicit ec: ExecutionContext): Future[MessageBody] = {
+    val messageBodyPersistenceModel = MessageBodyPersistenceModel.createNewWith(taxId, content)
 
     insert(messageBodyPersistenceModel).map { (result: WriteResult) =>
       messageBodyPersistenceModel.toMessageBody()
@@ -45,9 +46,7 @@ class MongoMessageBodyRepository(implicit mongo: () => DB)
 
   override def findBy(id: MessageBodyId)(implicit ec: ExecutionContext): Future[Either[BodyNotFound.type, MessageBody]] =
     Future.fromTry(BSONObjectID.parse(id.value)).flatMap { bsonID =>
-      Logger.error(s"findBy bson object id --> ${bsonID.stringify}")
       findById(bsonID).map { result =>
-        Logger.error(s"found --> ${bsonID.stringify} as $result")
         result match {
 
           case Some(model) => Right(model.toMessageBody())

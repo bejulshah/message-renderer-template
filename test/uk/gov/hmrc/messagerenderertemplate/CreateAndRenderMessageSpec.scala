@@ -31,7 +31,7 @@ import reactivemongo.json.ImplicitBSONHandlers._
 import reactivemongo.json.collection.JSONCollection
 import uk.gov.hmrc.domain.TaxIds.TaxIdWithName
 import uk.gov.hmrc.play.http.test.ResponseMatchers.{status => statusOf, _}
-import uk.gov.hmrc.domain.{Nino, SaUtr}
+import uk.gov.hmrc.domain.{Generator, Nino, SaUtr}
 import uk.gov.hmrc.messagerenderertemplate.acceptance.microservices.{AuthServiceMock, MessageServiceMock}
 import uk.gov.hmrc.messagerenderertemplate.domain._
 import uk.gov.hmrc.messagerenderertemplate.persistence.model.MessageBodyPersistenceModel
@@ -223,6 +223,7 @@ class CreateAndRenderMessageSpec extends UnitSpec
           "_id" -> BSONObjectID(
             messageBodyId
           ),
+          "taxId" -> Json.obj("name" -> JsString(messageHeader.recipient.identifier.name), "value" -> JsString(messageHeader.recipient.identifier.value)),
           "content" -> messageBodyFor(messageBodyId, messageHeader).content,
           "createdAt" -> fixedDateTime
         )
@@ -233,7 +234,8 @@ class CreateAndRenderMessageSpec extends UnitSpec
   "GET /messages/:id" should {
 
     "render a message when provided a valid ID" in {
-      val messageBody: MessageBody = messageBodyHasBeenPersistedWith("<div>this is an example content</div>")
+      val nino = new Generator(new Random()).nextNino
+      val messageBody: MessageBody = messageBodyHasBeenPersistedWith(nino, "<div>this is an example content</div>")
 
       getMessageBy(messageBody.id) should have(
         body(messageBody.content),
@@ -255,8 +257,8 @@ class CreateAndRenderMessageSpec extends UnitSpec
 
   }
 
-  def messageBodyHasBeenPersistedWith(content: String): MessageBody = {
-    val msg = MessageBodyPersistenceModel.createNewWith(content)
+  def messageBodyHasBeenPersistedWith(taxId:TaxIdWithName, content: String): MessageBody = {
+    val msg = MessageBodyPersistenceModel.createNewWith(taxId, content)
     await(
       mongo().collection[JSONCollection]("messageBodies").insert(Json.toJson(msg).as[JsObject])
     ).n shouldBe 1

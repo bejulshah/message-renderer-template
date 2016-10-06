@@ -44,7 +44,7 @@ trait MessageRendererController extends BaseController {
       withJsonBody[MessageCreationRequest] { messageCreationRequest =>
         val newMessageHeader = messageCreationRequest.generateMessage()
 
-        messageBodyRepository.addNewMessageBodyWith(
+        messageBodyRepository.addNewMessageBodyWith( newMessageHeader.recipient.identifier,
           content =
             s"""<h2>${newMessageHeader.subject}</h2>
                 |<div>Created at ${DateTimeUtils.now.toString()}</div>
