@@ -92,12 +92,7 @@ class CreateAndRenderMessageSpec extends UnitSpec
 
   def randomUtr = SaUtr(random.nextInt(1000000).toString)
 
-  def randomNino = {
-    val prefix = Nino.validPrefixes(random.nextInt(Nino.validPrefixes.length))
-    val number = random.nextInt(1000000)
-    val suffix = Nino.validSuffixes(random.nextInt(Nino.validSuffixes.length))
-    Nino(f"$prefix$number%06d$suffix")
-  }
+  def randomNino = new Generator(random).nextNino
 
   object TestGlobal extends play.api.GlobalSettings
 
@@ -128,6 +123,7 @@ class CreateAndRenderMessageSpec extends UnitSpec
                      messageHeader: MessageHeader) = {
     MessageBody(
       id = MessageBodyId(messageBodyId),
+      taxId = messageHeader.recipient.identifier,
       content =
         s"""<h2>${messageHeader.subject}</h2>
             |<div>Created at ${time.DateTimeUtils.now.toString()}</div>
@@ -234,16 +230,18 @@ class CreateAndRenderMessageSpec extends UnitSpec
   "GET /messages/:id" should {
 
     "render a message when provided a valid ID" in {
-      val nino = new Generator(new Random()).nextNino
+      val nino = randomNino
       val messageBody: MessageBody = messageBodyHasBeenPersistedWith(nino, "<div>this is an example content</div>")
+      auth.succeedsFor(TaxEntity("paye", nino))
 
       getMessageBy(messageBody.id) should have(
-        body(messageBody.content),
-        statusOf(200)
+        statusOf(200),
+        body(messageBody.content)
       )
     }
 
     "return a 404 when provided a missing ID" in {
+      auth.succeedsFor(TaxEntity("paye", randomNino))
       getMessageBy(MessageBodyId(BSONObjectID.generate.stringify)) should have(
         statusOf(404)
       )

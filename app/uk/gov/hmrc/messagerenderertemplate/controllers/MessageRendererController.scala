@@ -18,7 +18,7 @@ package uk.gov.hmrc.messagerenderertemplate.controllers
 
 import play.api.libs.json.Json
 import play.api.mvc._
-import uk.gov.hmrc.messagerenderertemplate.connectors.MessageHeaderServiceConnector
+import uk.gov.hmrc.messagerenderertemplate.connectors.{MessageHeaderServiceConnector, MicroserviceAuthConnector}
 import uk.gov.hmrc.messagerenderertemplate.controllers.model.MessageCreationRequest
 import uk.gov.hmrc.messagerenderertemplate.domain._
 import uk.gov.hmrc.messagerenderertemplate.persistence.MongoMessageBodyRepository
@@ -31,6 +31,8 @@ object MessageRendererController extends MessageRendererController {
   override lazy val messageHeaderRepository: MessageHeaderRepository = new MessageHeaderServiceConnector
 
   override lazy val messageBodyRepository: MessageBodyRepository = MongoMessageBodyRepository
+
+  override lazy val authConnector: MicroserviceAuthConnector = MicroserviceAuthConnector
 }
 
 trait MessageRendererController extends BaseController {
@@ -38,6 +40,8 @@ trait MessageRendererController extends BaseController {
   def messageHeaderRepository: MessageHeaderRepository
 
   def messageBodyRepository: MessageBodyRepository
+
+  def authConnector: MicroserviceAuthConnector
 
   def newMessage() = Action.async(parse.json) {
     implicit request =>
@@ -63,8 +67,14 @@ trait MessageRendererController extends BaseController {
   }
 
   def render(id: MessageBodyId) = Action.async { implicit request =>
-    messageBodyRepository.findBy(id).map {
-      _.fold(_ => NotFound, body => Ok(body.content))
+    for {
+      messageBody <- messageBodyRepository.findBy(id)
+      currentTaxIds <- authConnector.currentTaxIdentifiers
+    } yield {
+      messageBody match {
+        case Left(_) => NotFound
+        case Right(message) => currentTaxIds.find(_ == message.taxId).map(_ => Ok(message.content)).getOrElse(Unauthorized)
+      }
     }
   }
 

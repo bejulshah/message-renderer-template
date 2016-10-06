@@ -33,6 +33,7 @@ case class MessageBodyPersistenceModel(_id: BSONObjectID,
   def toMessageBody(): MessageBody = {
     MessageBody(
       id = MessageBodyId(_id.stringify),
+      taxId = taxId,
       content = content
     )
   }
@@ -62,6 +63,4 @@ object MessageBodyPersistenceModel {
   }
 
   implicit val formats: Format[MessageBodyPersistenceModel] = Json.format[MessageBodyPersistenceModel]
-
-
 }
