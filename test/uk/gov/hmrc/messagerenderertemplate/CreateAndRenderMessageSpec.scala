@@ -31,7 +31,7 @@ import reactivemongo.json.ImplicitBSONHandlers._
 import reactivemongo.json.collection.JSONCollection
 import uk.gov.hmrc.domain.TaxIds.TaxIdWithName
 import uk.gov.hmrc.play.http.test.ResponseMatchers.{status => statusOf, _}
-import uk.gov.hmrc.domain.{Nino, SaUtr}
+import uk.gov.hmrc.domain.{Generator, Nino, SaUtr}
 import uk.gov.hmrc.messagerenderertemplate.acceptance.microservices.{AuthServiceMock, MessageServiceMock}
 import uk.gov.hmrc.messagerenderertemplate.domain._
 import uk.gov.hmrc.messagerenderertemplate.persistence.model.MessageBodyPersistenceModel
@@ -92,19 +92,14 @@ class CreateAndRenderMessageSpec extends UnitSpec
 
   def randomUtr = SaUtr(random.nextInt(1000000).toString)
 
-  def randomNino = {
-    val prefix = Nino.validPrefixes(random.nextInt(Nino.validPrefixes.length))
-    val number = random.nextInt(1000000)
-    val suffix = Nino.validSuffixes(random.nextInt(Nino.validSuffixes.length))
-    Nino(f"$prefix$number%06d$suffix")
-  }
+  def randomNino = new Generator(random).nextNino
 
   object TestGlobal extends play.api.GlobalSettings
 
   implicit val app = FakeApplication(
     withGlobal = Some(TestGlobal),
     additionalConfiguration = Map(
-      "appName" -> "message-renderer-template",
+      "application.router" -> "testOnlyDoNotUseInAppConf.Routes",
       "appUrl" -> "http://microservice-name.service",
       "auditing.enabled" -> "false",
       "mongodb.uri" -> mongoUri
@@ -128,6 +123,7 @@ class CreateAndRenderMessageSpec extends UnitSpec
                      messageHeader: MessageHeader) = {
     MessageBody(
       id = MessageBodyId(messageBodyId),
+      taxId = messageHeader.recipient.identifier,
       content =
         s"""<h2>${messageHeader.subject}</h2>
             |<div>Created at ${time.DateTimeUtils.now.toString()}</div>
@@ -151,9 +147,11 @@ class CreateAndRenderMessageSpec extends UnitSpec
     json.toString
   }
 
-  def appPath(path: String) = {
-    s"http://localhost:$appPort/message-renderer-template$path"
+  def appPath(url: String): String = {
+    path(s"/message-renderer-template$url")
   }
+
+  def path(path: String): String = s"http://localhost:$appPort$path"
 
   def callCreateMessageWith(creationRequest: String) = {
     WS.url(appPath("/messages")).
@@ -167,6 +165,11 @@ class CreateAndRenderMessageSpec extends UnitSpec
     WS.url(appPath(s"/messages/${id.value}")).
       withHeaders(HttpHeaders.AUTHORIZATION -> auth.token).
       get()
+
+  def deleteAllMessageBodies() = {
+    val result = WS.url(path("/test-only/messages")).delete()
+    result.futureValue.status shouldBe 200
+  }
 
   val messageHeaders = Table(
     "messageHeaders",
@@ -223,6 +226,7 @@ class CreateAndRenderMessageSpec extends UnitSpec
           "_id" -> BSONObjectID(
             messageBodyId
           ),
+          "taxId" -> Json.obj("name" -> JsString(messageHeader.recipient.identifier.name), "value" -> JsString(messageHeader.recipient.identifier.value)),
           "content" -> messageBodyFor(messageBodyId, messageHeader).content,
           "createdAt" -> fixedDateTime
         )
@@ -233,15 +237,26 @@ class CreateAndRenderMessageSpec extends UnitSpec
   "GET /messages/:id" should {
 
     "render a message when provided a valid ID" in {
-      val messageBody: MessageBody = messageBodyHasBeenPersistedWith("<div>this is an example content</div>")
+      val nino = randomNino
+      val messageBody: MessageBody = messageBodyHasBeenPersistedWith(nino, "<div>this is an example content</div>")
+      auth.succeedsFor(TaxEntity("paye", nino))
 
       getMessageBy(messageBody.id) should have(
-        body(messageBody.content),
-        statusOf(200)
+        statusOf(200),
+        body(messageBody.content)
       )
     }
 
+    "return 401 render a message does not belong to the auth tax ID" in {
+      val nino = randomNino
+      val messageBody: MessageBody = messageBodyHasBeenPersistedWith(nino, "<div>this is an example content</div>")
+
+      auth.succeedsFor(TaxEntity("paye", randomNino))
+      getMessageBy(messageBody.id) should have(statusOf(401))
+    }
+
     "return a 404 when provided a missing ID" in {
+      auth.succeedsFor(TaxEntity("paye", randomNino))
       getMessageBy(MessageBodyId(BSONObjectID.generate.stringify)) should have(
         statusOf(404)
       )
@@ -255,8 +270,27 @@ class CreateAndRenderMessageSpec extends UnitSpec
 
   }
 
-  def messageBodyHasBeenPersistedWith(content: String): MessageBody = {
-    val msg = MessageBodyPersistenceModel.createNewWith(content)
+  "DELETE /test-only/messages" should {
+    s"delete all messages" in {
+      val messageHeader = messageHeaderFor(randomUtr, "sa", statutory = Some(true))
+      messageService.successfullyCreates(messageHeader)
+
+      val response = callCreateMessageWith(
+        messageCreationRequestFor(messageHeader)
+      )
+
+      response.futureValue.status shouldBe Status.CREATED
+
+      mongo().collection[JSONCollection]("messageBodies").count().futureValue shouldBe 1
+
+      deleteAllMessageBodies()
+
+      mongo().collection[JSONCollection]("messageBodies").count().futureValue shouldBe 0
+    }
+  }
+
+  def messageBodyHasBeenPersistedWith(taxId: TaxIdWithName, content: String): MessageBody = {
+    val msg = MessageBodyPersistenceModel.createNewWith(taxId, content)
     await(
       mongo().collection[JSONCollection]("messageBodies").insert(Json.toJson(msg).as[JsObject])
     ).n shouldBe 1

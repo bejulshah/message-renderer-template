@@ -16,12 +16,14 @@
 
 package uk.gov.hmrc.messagerenderertemplate.domain
 
+import uk.gov.hmrc.domain.TaxIds.TaxIdWithName
+
 import scala.concurrent.{ExecutionContext, Future}
 
 trait MessageBodyRepository {
   def findBy(id: MessageBodyId)(implicit ec: ExecutionContext): Future[Either[BodyNotFound.type, MessageBody]]
 
-  def addNewMessageBodyWith(content: String)(implicit ec: ExecutionContext): Future[MessageBody]
+  def addNewMessageBodyWith(taxId: TaxIdWithName, content: String)(implicit ec: ExecutionContext): Future[MessageBody]
 }
 
 case object BodyNotFound

@@ -47,7 +47,10 @@ object MessageHeaderCreation {
     MessageHeaderCreation(
       header.recipient,
       header.subject,
-      hash(Seq(serviceName, header.subject, body.content)),
+      hash(Seq(header.recipient.regime,
+        header.recipient.identifier.name,
+        header.recipient.identifier.value,
+        serviceName, header.subject, body.content)),
       RenderUrl(serviceName, s"${routes.MessageRendererController.render(body.id).url}"),
       header.alertDetails,
       header.validFrom,
