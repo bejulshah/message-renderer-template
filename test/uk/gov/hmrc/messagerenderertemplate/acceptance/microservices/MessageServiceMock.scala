@@ -62,7 +62,7 @@ class MessageServiceMock(authToken: String, servicePort: Int = 8910)
        |     }
        |   },
        |   "subject": "${messageHeader.subject}",
-       |   "hash": "${hash}",
+       |   "hash": "$hash",
        |   "validFrom": "${messageHeader.validFrom}",
        |   "renderUrl": {
        |     "service": "message-renderer-template",

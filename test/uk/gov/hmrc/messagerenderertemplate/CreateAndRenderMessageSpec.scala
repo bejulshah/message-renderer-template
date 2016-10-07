@@ -99,7 +99,7 @@ class CreateAndRenderMessageSpec extends UnitSpec
   implicit val app = FakeApplication(
     withGlobal = Some(TestGlobal),
     additionalConfiguration = Map(
-      "appName" -> "message-renderer-template",
+      "application.router" -> "testOnlyDoNotUseInAppConf.Routes",
       "appUrl" -> "http://microservice-name.service",
       "auditing.enabled" -> "false",
       "mongodb.uri" -> mongoUri
@@ -147,9 +147,11 @@ class CreateAndRenderMessageSpec extends UnitSpec
     json.toString
   }
 
-  def appPath(path: String) = {
-    s"http://localhost:$appPort/message-renderer-template$path"
+  def appPath(url: String): String = {
+    path(s"/message-renderer-template$url")
   }
+
+  def path(path: String): String = s"http://localhost:$appPort$path"
 
   def callCreateMessageWith(creationRequest: String) = {
     WS.url(appPath("/messages")).
@@ -163,6 +165,11 @@ class CreateAndRenderMessageSpec extends UnitSpec
     WS.url(appPath(s"/messages/${id.value}")).
       withHeaders(HttpHeaders.AUTHORIZATION -> auth.token).
       get()
+
+  def deleteAllMessageBodies() = {
+    val result = WS.url(path("/test-only/messages")).delete()
+    result.futureValue.status shouldBe 200
+  }
 
   val messageHeaders = Table(
     "messageHeaders",
@@ -255,7 +262,26 @@ class CreateAndRenderMessageSpec extends UnitSpec
 
   }
 
-  def messageBodyHasBeenPersistedWith(taxId:TaxIdWithName, content: String): MessageBody = {
+  "DELETE /test-only/messages" should {
+    s"delete all messages" in {
+      val messageHeader = messageHeaderFor(randomUtr, "sa", statutory = Some(true))
+      messageService.successfullyCreates(messageHeader)
+
+      val response = callCreateMessageWith(
+        messageCreationRequestFor(messageHeader)
+      )
+
+      response.futureValue.status shouldBe Status.CREATED
+
+      mongo().collection[JSONCollection]("messageBodies").count().futureValue shouldBe 1
+
+      deleteAllMessageBodies()
+
+      mongo().collection[JSONCollection]("messageBodies").count().futureValue shouldBe 0
+    }
+  }
+
+  def messageBodyHasBeenPersistedWith(taxId: TaxIdWithName, content: String): MessageBody = {
     val msg = MessageBodyPersistenceModel.createNewWith(taxId, content)
     await(
       mongo().collection[JSONCollection]("messageBodies").insert(Json.toJson(msg).as[JsObject])
