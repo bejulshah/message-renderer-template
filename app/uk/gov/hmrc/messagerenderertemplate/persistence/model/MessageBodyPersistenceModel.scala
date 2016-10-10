@@ -28,22 +28,25 @@ import uk.gov.hmrc.time.DateTimeUtils
 
 case class MessageBodyPersistenceModel(_id: BSONObjectID,
                                        content: String,
+                                       subject: String,
                                        taxId: TaxIdWithName,
                                        createdAt: DateTime) {
   def toMessageBody(): MessageBody = {
     MessageBody(
       id = MessageBodyId(_id.stringify),
       taxId = taxId,
-      content = content
+      content = content,
+      subject = subject
     )
   }
 }
 
 object MessageBodyPersistenceModel {
-  def createNewWith(taxId: TaxIdWithName, content: String) = {
+  def createNewWith(taxId: TaxIdWithName, subject: String, content: String) = {
     MessageBodyPersistenceModel(
       _id = BSONObjectID.generate,
       content = content,
+      subject = subject,
       taxId = taxId,
       createdAt = DateTimeUtils.now
     )

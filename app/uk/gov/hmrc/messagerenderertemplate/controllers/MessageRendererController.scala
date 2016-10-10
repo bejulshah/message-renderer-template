@@ -18,6 +18,7 @@ package uk.gov.hmrc.messagerenderertemplate.controllers
 
 import play.api.libs.json.Json
 import play.api.mvc._
+import play.utils.UriEncoding
 import uk.gov.hmrc.messagerenderertemplate.connectors.{MessageHeaderServiceConnector, MicroserviceAuthConnector}
 import uk.gov.hmrc.messagerenderertemplate.controllers.model.MessageCreationRequest
 import uk.gov.hmrc.messagerenderertemplate.domain._
@@ -49,6 +50,7 @@ trait MessageRendererController extends BaseController {
         val newMessageHeader = messageCreationRequest.generateMessage()
 
         messageBodyRepository.addNewMessageBodyWith( newMessageHeader.recipient.identifier,
+          newMessageHeader.subject,
           content =
             s"""<h2>${newMessageHeader.subject}</h2>
                 |<div>Created at ${DateTimeUtils.now.toString()}</div>
@@ -73,7 +75,9 @@ trait MessageRendererController extends BaseController {
     } yield {
       messageBody match {
         case Left(_) => NotFound
-        case Right(message) => currentTaxIds.find(_ == message.taxId).map(_ => Ok(message.content)).getOrElse(Unauthorized)
+        case Right(message) => currentTaxIds.find(_ == message.taxId).map(_ =>
+          Ok(message.content).withHeaders("X-Title" -> UriEncoding.encodePathSegment(message.subject, "UTF-8"))
+      ).getOrElse(Unauthorized)
       }
     }
   }
