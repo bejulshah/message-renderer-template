@@ -28,13 +28,11 @@ Example Self Assessment message creation request for saUtr:
 
 ```json
   {
-  	"recipient" : {
   		"regime" : "sa",
   		"taxId" : {
   			"name": "sautr",
         "value": "1234567899"
-  		}
-  	},
+  	 },
     "statutory" : true
   } 
 ```
@@ -43,13 +41,11 @@ Example message creation request for nino:
 
 ```json
   {
-  	"recipient" : {
   		"regime" : "paye",
   		"taxId" : {
   			"name": "nino",
         "value" : "QQ123456C"
   		}
-  	}
   } 
 ```
 
