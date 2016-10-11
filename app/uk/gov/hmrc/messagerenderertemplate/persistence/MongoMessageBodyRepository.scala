@@ -36,8 +36,8 @@ class MongoMessageBodyRepository(implicit mongo: () => DB)
     ReactiveMongoFormats.objectIdFormats
   ) with MessageBodyRepository {
 
-  override def addNewMessageBodyWith(taxId: TaxIdWithName, content: String)(implicit ec: ExecutionContext): Future[MessageBody] = {
-    val messageBodyPersistenceModel = MessageBodyPersistenceModel.createNewWith(taxId, content)
+  override def addNewMessageBodyWith(taxId: TaxIdWithName, subject: String, content: String)(implicit ec: ExecutionContext): Future[MessageBody] = {
+    val messageBodyPersistenceModel = MessageBodyPersistenceModel.createNewWith(taxId, subject, content)
 
     insert(messageBodyPersistenceModel).map { (result: WriteResult) =>
       messageBodyPersistenceModel.toMessageBody()

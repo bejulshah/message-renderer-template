@@ -19,4 +19,4 @@ package uk.gov.hmrc.messagerenderertemplate.domain
 import uk.gov.hmrc.domain.TaxIds.TaxIdWithName
 
 final case class MessageBodyId(value: String)
-final case class MessageBody(id: MessageBodyId, taxId: TaxIdWithName, content: String)
+final case class MessageBody(id: MessageBodyId, taxId: TaxIdWithName, content: String, subject: String)

@@ -30,13 +30,13 @@ import reactivemongo.bson.BSONObjectID
 import reactivemongo.json.ImplicitBSONHandlers._
 import reactivemongo.json.collection.JSONCollection
 import uk.gov.hmrc.domain.TaxIds.TaxIdWithName
-import uk.gov.hmrc.play.http.test.ResponseMatchers.{status => statusOf, _}
-import uk.gov.hmrc.domain.{Generator, Nino, SaUtr}
+import uk.gov.hmrc.domain.{Generator, SaUtr}
 import uk.gov.hmrc.messagerenderertemplate.acceptance.microservices.{AuthServiceMock, MessageServiceMock}
 import uk.gov.hmrc.messagerenderertemplate.domain._
 import uk.gov.hmrc.messagerenderertemplate.persistence.model.MessageBodyPersistenceModel
 import uk.gov.hmrc.mongo.MongoSpecSupport
 import uk.gov.hmrc.mongo.json.ReactiveMongoFormats.dateTimeFormats
+import uk.gov.hmrc.play.http.test.ResponseMatchers.{status => statusOf, _}
 import uk.gov.hmrc.play.it.Port
 import uk.gov.hmrc.play.test.{UnitSpec, WithFakeApplication}
 import uk.gov.hmrc.time
@@ -129,7 +129,8 @@ class CreateAndRenderMessageSpec extends UnitSpec
             |<div>Created at ${time.DateTimeUtils.now.toString()}</div>
             |<div>This is a message that has been generated for user from ${messageHeader.recipient.regime}
             |with ${messageHeader.recipient.identifier.name} value of ${messageHeader.recipient.identifier.value}.
-            |</div>""".stripMargin.replaceAll("\n", " ")
+            |</div>""".stripMargin.replaceAll("\n", " "),
+      subject = messageHeader.subject
     )
   }
 
@@ -228,6 +229,7 @@ class CreateAndRenderMessageSpec extends UnitSpec
           ),
           "taxId" -> Json.obj("name" -> JsString(messageHeader.recipient.identifier.name), "value" -> JsString(messageHeader.recipient.identifier.value)),
           "content" -> messageBodyFor(messageBodyId, messageHeader).content,
+          "subject" -> "Auto generated test message",
           "createdAt" -> fixedDateTime
         )
       }
@@ -238,18 +240,21 @@ class CreateAndRenderMessageSpec extends UnitSpec
 
     "render a message when provided a valid ID" in {
       val nino = randomNino
-      val messageBody: MessageBody = messageBodyHasBeenPersistedWith(nino, "<div>this is an example content</div>")
+      val messageBody: MessageBody = messageBodyHasBeenPersistedWith(nino, "<div>this is an example content</div>", "message subject")
       auth.succeedsFor(TaxEntity("paye", nino))
 
-      getMessageBy(messageBody.id) should have(
+      val result = getMessageBy(messageBody.id)
+      result should have(
         statusOf(200),
         body(messageBody.content)
       )
+       result.futureValue.header("X-Title") should contain("message%20subject")
+
     }
 
     "return 401 render a message does not belong to the auth tax ID" in {
       val nino = randomNino
-      val messageBody: MessageBody = messageBodyHasBeenPersistedWith(nino, "<div>this is an example content</div>")
+      val messageBody: MessageBody = messageBodyHasBeenPersistedWith(nino, "<div>this is an example content</div>", "Subject Line")
 
       auth.succeedsFor(TaxEntity("paye", randomNino))
       getMessageBy(messageBody.id) should have(statusOf(401))
@@ -289,8 +294,8 @@ class CreateAndRenderMessageSpec extends UnitSpec
     }
   }
 
-  def messageBodyHasBeenPersistedWith(taxId: TaxIdWithName, content: String): MessageBody = {
-    val msg = MessageBodyPersistenceModel.createNewWith(taxId, content)
+  def messageBodyHasBeenPersistedWith(taxId: TaxIdWithName, content: String, subject: String): MessageBody = {
+    val msg = MessageBodyPersistenceModel.createNewWith(taxId = taxId, content = content, subject = subject)
     await(
       mongo().collection[JSONCollection]("messageBodies").insert(Json.toJson(msg).as[JsObject])
     ).n shouldBe 1

@@ -23,7 +23,7 @@ import scala.concurrent.{ExecutionContext, Future}
 trait MessageBodyRepository {
   def findBy(id: MessageBodyId)(implicit ec: ExecutionContext): Future[Either[BodyNotFound.type, MessageBody]]
 
-  def addNewMessageBodyWith(taxId: TaxIdWithName, content: String)(implicit ec: ExecutionContext): Future[MessageBody]
+  def addNewMessageBodyWith(taxId: TaxIdWithName, subject: String, content: String)(implicit ec: ExecutionContext): Future[MessageBody]
 }
 
 case object BodyNotFound
